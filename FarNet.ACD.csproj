@@ -1,0 +1,90 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProductVersion>8.0.30703</ProductVersion>
+    <SchemaVersion>2.0</SchemaVersion>
+    <ProjectGuid>{BE8CA25E-3E8D-4180-BAB2-C0A68349D8DA}</ProjectGuid>
+    <OutputType>Library</OutputType>
+    <RootNamespace>FarNet.ACD</RootNamespace>
+    <AssemblyName>FarNet.ACD</AssemblyName>
+    <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
+    <FileAlignment>512</FileAlignment>
+    <TargetFrameworkProfile />
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <OutputPath>bin\Debug\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <Prefer32Bit>false</Prefer32Bit>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <DebugType>pdbonly</DebugType>
+    <Optimize>true</Optimize>
+    <OutputPath>bin\Release\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <DocumentationFile>bin\Release\FarNet.ACD.XML</DocumentationFile>
+    <Prefer32Bit>false</Prefer32Bit>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="AmazonCloudDriveApi, Version=1.1.0.16730, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>packages\AmazonCloudDriveApi.1.2\lib\net45\AmazonCloudDriveApi.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="FarNet, Version=5.0.63.0, Culture=neutral, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>C:\Program Files\Far Manager\FarNet\FarNet.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="FarNet.Settings">
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="Newtonsoft.Json, Version=8.0.0.0, Culture=neutral, PublicKeyToken=30ad4fe6b2a6aeed, processorArchitecture=MSIL">
+      <HintPath>packages\Newtonsoft.Json.8.0.2\lib\net45\Newtonsoft.Json.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="System" />
+    <Reference Include="System.Configuration" />
+    <Reference Include="System.Data" />
+    <Reference Include="System.Windows.Forms" />
+    <Reference Include="System.Xml" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="ACDClient.cs" />
+    <Compile Include="ACDCommand.cs" />
+    <Compile Include="ACDExplorer.cs" />
+    <Compile Include="ACDHost.cs" />
+    <Compile Include="ACDPanel.cs" />
+    <Compile Include="ACDTool.cs" />
+    <Compile Include="FSItem.cs" />
+    <Compile Include="ACDSettings.cs" />
+    <Compile Include="UserData.cs" />
+    <Compile Include="Utility.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="Help.en.hlf" />
+    <Content Include="Help.ru.hlf" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="packages.config" />
+  </ItemGroup>
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <PropertyGroup>
+    <Install Condition="'$(Install)' == ''">$(FARHOME)\FarNet\Modules</Install>
+  </PropertyGroup>
+  <Target Name="Resources">
+    <GenerateResource Sources="FarNet.ACD.restext;FarNet.ACD.ru.restext" OutputResources="Bin\$(Configuration)\FarNet.ACD.resources;Bin\$(Configuration)\FarNet.ACD.ru.resources" />
+  </Target>
+  <Target Name="AfterBuild" DependsOnTargets="Resources">
+    <Copy SourceFiles="@(Content);Bin\$(Configuration)\$(AssemblyName).dll;Bin\$(Configuration)\FarNet.ACD.resources;Bin\$(Configuration)\FarNet.ACD.ru.resources" DestinationFolder="$(Install)\$(AssemblyName)" SkipUnchangedFiles="true" />
+  </Target>
+</Project>
