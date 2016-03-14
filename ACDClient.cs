@@ -12,14 +12,36 @@ using Azi.Amazon.CloudDrive.JsonObjects;
 
 namespace FarNet.ACD
 {
+    /// <summary>
+    /// TODO
+    /// </summary>
     class ACDClient : ITokenUpdateListener
     {
+        /// <summary>
+        /// TODO
+        /// </summary>
         private AmazonDrive amazon;
+
+        /// <summary>
+        /// TODO
+        /// </summary>
+        private bool IsAuthenticated = false;
+
+        /// <summary>
+        /// TODO
+        /// </summary>
         private static readonly AmazonNodeKind[] FsItemKinds = { AmazonNodeKind.FILE, AmazonNodeKind.FOLDER };
 
+        /// <summary>
+        /// TODO
+        /// </summary>
+        /// <param name="cs"></param>
+        /// <param name="interactiveAuth"></param>
+        /// <returns></returns>
         public async Task<AmazonDrive> Authenticate(CancellationToken cs, bool interactiveAuth = true)
         {
             var Settings = ACDSettings.Default;
+
             //var settings = Gui.Properties.Settings.Default;
             amazon = new AmazonDrive(Settings.ClientId, Settings.ClientSecret);
             amazon.OnTokenUpdate = this;
@@ -36,15 +58,20 @@ namespace FarNet.ACD
             }
 
 
-            if (await amazon.AuthenticationByExternalBrowser(CloudDriveScope.ReadAll | CloudDriveScope.Write, TimeSpan.FromMinutes(10), cs, "http://localhost:{0}/signin/"))
+            if (await amazon.AuthenticationByExternalBrowser(CloudDriveScopes.ReadAll | CloudDriveScopes.Write, TimeSpan.FromSeconds(10), cs, "http://localhost:{0}/signin/"))
             {
                 return amazon;
             }
 
-            cs.ThrowIfCancellationRequested();
+            //cs.ThrowIfCancellationRequested();
             return null;
         }
 
+        /// <summary>
+        /// TODO
+        /// </summary>
+        /// <param name="itemPath"></param>
+        /// <returns></returns>
         private async Task<FSItem> FetchNode(string itemPath)
         {
             //Far.Api.ShowError("Not implemented", new NotImplementedException("Not implemented: " + itemPath));
@@ -94,6 +121,11 @@ namespace FarNet.ACD
             return item;
         }
 
+        /// <summary>
+        /// TODO
+        /// </summary>
+        /// <param name="folderPath"></param>
+        /// <returns></returns>
         public async Task<IList<FSItem>> GetDirItems(string folderPath)
         {
             var folderNode = FetchNode(folderPath).Result;
@@ -120,6 +152,12 @@ namespace FarNet.ACD
             return items;
         }
 
+        /// <summary>
+        /// TODO
+        /// </summary>
+        /// <param name="access_token"></param>
+        /// <param name="refresh_token"></param>
+        /// <param name="expires_in"></param>
         public void OnTokenUpdated(string access_token, string refresh_token, DateTime expires_in)
         {
             var settings = ACDSettings.Default;
@@ -129,29 +167,78 @@ namespace FarNet.ACD
             settings.Save();
         }
 
+        public bool UIAuthenticate()
+        {
+            var cs = new CancellationTokenSource();
+            var token = cs.Token;
+
+            var form = new Tools.ProgressForm();
+            form.Canceled += delegate
+            {
+                cs.Cancel(false);
+            };
+            form.Title = "Amazon Cloud Drive: Authentication";
+            form.Activity = "Authenticating...";
+            form.CanCancel = true;
+
+            Task<AmazonDrive> task = Authenticate(token, true);
+
+            var _task = Task.Factory.StartNew(() =>
+            {
+                form.Show();
+            });
+
+            try
+            {
+                task.Wait(token);
+            }
+            catch (AggregateException) // some exception in event (most likely timeout)
+            {
+                form.Complete();
+            }
+            catch (OperationCanceledException) // cancellation was requested from the dialog
+            {
+            }
+
+            if (!token.IsCancellationRequested && task.Status == TaskStatus.RanToCompletion)
+            {
+                form.Complete();
+                return IsAuthenticated = true;
+            }
+
+            return IsAuthenticated = false;
+        }
+
+        /// <summary>
+        /// TODO
+        /// </summary>
+        /// <param name="Path"></param>
+        /// <returns></returns>
         public IList<FarFile> GetFiles(string Path = "\\")
         {
+            Log.Source.TraceInformation("ACDClient::GetFiles, Path = {0}", Path);
             IList<FarFile> Files = new List<FarFile>();
-            var cs = new CancellationTokenSource();
-            Task<AmazonDrive> task = Authenticate(cs.Token, true);
-            task.Wait(60000); //TODO: show some dialog and allow manual cancellation
-            if (task.IsCompleted)
+
+            if (!IsAuthenticated && !UIAuthenticate())
             {
-                var items = GetDirItems(Path).Result;
-                foreach (var item in items)
-                {
-                    SetFile file = new SetFile();
-                    file.Name = item.Name;
-                    file.Description = item.Id;
-                    file.IsDirectory = item.IsDir;
-                    file.LastAccessTime = item.LastAccessTime;
-                    file.LastWriteTime = item.LastWriteTime;
-                    file.Length = item.Length;
-                    file.CreationTime = item.CreationTime;
-                    file.Data = new Hashtable();
-                    ((Hashtable)file.Data).Add("fsitem", item);
-                    Files.Add(file);
-                }
+                throw new TaskCanceledException();
+            }
+
+            var itemsData = GetDirItems(Path);
+            var items = itemsData.Result;
+            foreach (var item in items)
+            {
+                SetFile file = new SetFile();
+                file.Name = item.Name;
+                file.Description = item.Id;
+                file.IsDirectory = item.IsDir;
+                file.LastAccessTime = item.LastAccessTime;
+                file.LastWriteTime = item.LastWriteTime;
+                file.Length = item.Length;
+                file.CreationTime = item.CreationTime;
+                file.Data = new Hashtable();
+                ((Hashtable)file.Data).Add("fsitem", item);
+                Files.Add(file);
             }
 
             return Files;

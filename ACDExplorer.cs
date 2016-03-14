@@ -2,13 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Resources;
-using System.Windows.Forms;
-using System.Threading.Tasks;
-using System.Threading;
 using System.Collections;
-using Azi.Amazon.CloudDrive;
-using Azi.Amazon.CloudDrive.JsonObjects;
 
 namespace FarNet.ACD
 {
@@ -17,7 +11,7 @@ namespace FarNet.ACD
 	/// </summary>
 	class ACDExplorer : Explorer
 	{
-        readonly ACDClient Client;
+        public readonly ACDClient Client;
         ACDPanel Panel;
 
 		public ACDExplorer(ACDClient client, ACDPanel panel = null, string path = "\\")
@@ -55,12 +49,16 @@ namespace FarNet.ACD
 
         public override IList<FarFile> GetFiles(GetFilesEventArgs args)
 		{
+            /*
             string path = "\\";
+
             if (Panel.CurrentFile != null)
             {
                 path = ((FSItem)((Hashtable)Panel.CurrentFile.Data)["fsitem"]).Path;
             }
-            
+            */
+            string path = Location;
+
             return Client.GetFiles(path);
         }
 

@@ -68,7 +68,7 @@ namespace FarNet.ACD
         /// <summary>
         /// AuthToken.
         /// </summary>
-		[Browsable(false)]
+		//[Browsable(false)]
         [UserScopedSetting]
         public string AuthToken
         {
@@ -78,7 +78,7 @@ namespace FarNet.ACD
         /// <summary>
         /// AuthRenewToken.
         /// </summary>
-		[Browsable(false)]
+		//[Browsable(false)]
         [UserScopedSetting]
         public string AuthRenewToken
         {
@@ -90,7 +90,7 @@ namespace FarNet.ACD
         /// <summary>
         /// AuthTokenExpiration.
         /// </summary>
-		[Browsable(false)]
+		//[Browsable(false)]
         [UserScopedSetting]
         [DefaultSettingValue("2000-11-22")]
         public DateTime AuthTokenExpiration

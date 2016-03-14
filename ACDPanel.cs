@@ -1,8 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
+using System.IO;
 using System.Threading.Tasks;
+using System.Threading;
 
 namespace FarNet.ACD
 {
@@ -99,6 +99,7 @@ namespace FarNet.ACD
             };
             SetPlan(PanelViewMode.AlternativeFull, plan);
 
+            Log.Source.TraceInformation("Entering DoExplored from Constructor");
             DoExplored((ACDExplorer)explorer);
         }
 
@@ -126,7 +127,17 @@ namespace FarNet.ACD
                             if (file.IsDirectory && !IgnoreDirectoryFlag)
                                 break;
 
+                            var cancellation = new CancellationTokenSource();
+                            var _cancel = cancellation.Token;
+
+                            //var ptask = new ProgressTask("test", "test-title", _cancel);
+                            //var form = ptask.ShowDialog();
+                            //Thread.Sleep(3000);
+                            //cancellation.Cancel();
+                            //form.Complete();
+
                             UIOpenFile(file);
+
                             return true;
                         }
 
@@ -238,6 +249,7 @@ namespace FarNet.ACD
             if (args == null) return;
 
             base.UIExplorerEntered(args);
+            Log.Source.TraceInformation("Entering DoExplored from UIExplorerEntered");
             DoExplored((ACDExplorer)args.Explorer);
         }
 
@@ -246,6 +258,7 @@ namespace FarNet.ACD
             //! path is used for Set-Location on Invoking()
             Title = "ACD: " + Explorer.Location;
             CurrentLocation = Explorer.Location;
+            Log.Source.TraceInformation("Title: {0}; CurrentLocation: {1}", Title, CurrentLocation);
 
             if (CurrentLocation == "\\")
             {
@@ -266,7 +279,19 @@ namespace FarNet.ACD
 
             args.Parameter = this;
 
-            return base.UIGetFiles(args);
+            try
+            {
+                var files = base.UIGetFiles(args);
+                return files;
+            }
+            catch (TaskCanceledException)
+            { }
+
+            args.Result = JobResult.Default;
+            //UIEscape(false); // crashes far
+            //this.Close(); // exception or far crash
+
+            return new List<FarFile>();
         }
     }
 }

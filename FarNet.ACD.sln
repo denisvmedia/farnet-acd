@@ -4,12 +4,17 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 VisualStudioVersion = 14.0.24720.0
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FarNet.ACD", "FarNet.ACD.csproj", "{BE8CA25E-3E8D-4180-BAB2-C0A68349D8DA}"
+	ProjectSection(ProjectDependencies) = postProject
+		{2C611335-3D92-492F-B3EB-2CF3955F63A1} = {2C611335-3D92-492F-B3EB-2CF3955F63A1}
+	EndProjectSection
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{77EBAA53-BF9D-49BE-A98E-4B55C0D57AB6}"
 	ProjectSection(SolutionItems) = preProject
 		FarNet.ACD.restext = FarNet.ACD.restext
 		FarNet.ACD.ru.restext = FarNet.ACD.ru.restext
 	EndProjectSection
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AmazonCloudDriveApi", "..\..\..\AmazonCloudDriveApi\AmazonCloudDriveApi\AmazonCloudDriveApi.csproj", "{2C611335-3D92-492F-B3EB-2CF3955F63A1}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -21,6 +26,10 @@ Global
 		{BE8CA25E-3E8D-4180-BAB2-C0A68349D8DA}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{BE8CA25E-3E8D-4180-BAB2-C0A68349D8DA}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{BE8CA25E-3E8D-4180-BAB2-C0A68349D8DA}.Release|Any CPU.Build.0 = Release|Any CPU
+		{2C611335-3D92-492F-B3EB-2CF3955F63A1}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{2C611335-3D92-492F-B3EB-2CF3955F63A1}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{2C611335-3D92-492F-B3EB-2CF3955F63A1}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{2C611335-3D92-492F-B3EB-2CF3955F63A1}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

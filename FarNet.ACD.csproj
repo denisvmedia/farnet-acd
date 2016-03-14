@@ -36,10 +36,6 @@
     <Prefer32Bit>false</Prefer32Bit>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="AmazonCloudDriveApi, Version=1.1.0.16730, Culture=neutral, processorArchitecture=MSIL">
-      <HintPath>packages\AmazonCloudDriveApi.1.2\lib\net45\AmazonCloudDriveApi.dll</HintPath>
-      <Private>True</Private>
-    </Reference>
     <Reference Include="FarNet, Version=5.0.63.0, Culture=neutral, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
       <HintPath>C:\Program Files\Far Manager\FarNet\FarNet.dll</HintPath>
@@ -47,6 +43,10 @@
     </Reference>
     <Reference Include="FarNet.Settings">
       <Private>False</Private>
+    </Reference>
+    <Reference Include="FarNet.Tools, Version=5.0.63.0, Culture=neutral, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>C:\Program Files\Far Manager\FarNet\FarNet.Tools.dll</HintPath>
     </Reference>
     <Reference Include="Newtonsoft.Json, Version=8.0.0.0, Culture=neutral, PublicKeyToken=30ad4fe6b2a6aeed, processorArchitecture=MSIL">
       <HintPath>packages\Newtonsoft.Json.8.0.2\lib\net45\Newtonsoft.Json.dll</HintPath>
@@ -62,11 +62,11 @@
     <Compile Include="ACDClient.cs" />
     <Compile Include="ACDCommand.cs" />
     <Compile Include="ACDExplorer.cs" />
-    <Compile Include="ACDHost.cs" />
     <Compile Include="ACDPanel.cs" />
     <Compile Include="ACDTool.cs" />
     <Compile Include="FSItem.cs" />
     <Compile Include="ACDSettings.cs" />
+    <Compile Include="ProgressTask.cs" />
     <Compile Include="UserData.cs" />
     <Compile Include="Utility.cs" />
   </ItemGroup>
@@ -76,6 +76,12 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\AmazonCloudDriveApi\AmazonCloudDriveApi\AmazonCloudDriveApi.csproj">
+      <Project>{2c611335-3d92-492f-b3eb-2cf3955f63a1}</Project>
+      <Name>AmazonCloudDriveApi</Name>
+    </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>
