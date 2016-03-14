@@ -58,7 +58,7 @@ namespace FarNet.ACD
             }
 
 
-            if (await amazon.AuthenticationByExternalBrowser(CloudDriveScopes.ReadAll | CloudDriveScopes.Write, TimeSpan.FromSeconds(10), cs, "http://localhost:{0}/signin/"))
+            if (await amazon.AuthenticationByExternalBrowser(CloudDriveScopes.ReadAll | CloudDriveScopes.Write, TimeSpan.FromMinutes(2), cs, "http://localhost:{0}/signin/"))
             {
                 return amazon;
             }
