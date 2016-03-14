@@ -60,18 +60,12 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="ACDClient.cs" />
-    <Compile Include="ACDCommand.cs" />
     <Compile Include="ACDExplorer.cs" />
     <Compile Include="ACDPanel.cs" />
     <Compile Include="ACDTool.cs" />
     <Compile Include="FSItem.cs" />
     <Compile Include="ACDSettings.cs" />
-    <Compile Include="UserData.cs" />
     <Compile Include="Utility.cs" />
-  </ItemGroup>
-  <ItemGroup>
-    <Content Include="Help.en.hlf" />
-    <Content Include="Help.ru.hlf" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
