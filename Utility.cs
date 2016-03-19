@@ -7,6 +7,29 @@ namespace FarNet.ACD
 {
     public static class Utility
     {
+        public static string BytesToString(long byteCount)
+        {
+            string Result;
+            long bytes = Math.Abs(byteCount);
+
+            if (bytes < 100 * 1024)
+            {
+                // Result = FormatFloat(L"#,##0 \"B\"", byteCount);
+                Result = string.Format("{0} B", bytes);
+            }
+            else if (bytes < 100 * 1024 * 1024)
+            {
+                // Result = FormatFloat(L"#,##0 \"KB\"", byteCount / 1024);
+                Result = string.Format("{0} KiB", Math.Round(bytes / 1024.0, 0));
+            }
+            else
+            {
+                // Result = FormatFloat(L"#,##0 \"MiB\"", byteCount / (1024*1024));
+                Result = string.Format("{0} MiB", Math.Round(bytes / (1024 * 1024.0), 0));
+            }
+            return Result;
+        }
+
         public static string var_dump(object obj, int recursion)
         {
             StringBuilder result = new StringBuilder();

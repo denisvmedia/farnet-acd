@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
 using System.Threading;
+using System.Collections;
 
 namespace FarNet.ACD
 {
@@ -168,6 +169,72 @@ namespace FarNet.ACD
                                 //UIViewAll();
                                 return true;
                             }
+                            break;
+                        }
+
+                        if (key.IsShift())
+                        {
+                            //ShowMenu();
+                            return true;
+                        }
+
+                        break;
+
+                    case KeyCode.F5:
+
+                        if (key.Is())
+                        {
+                            if (CurrentFile == null)
+                            {
+                                //UIViewAll();
+                                return true;
+                            }
+
+                            Log.Source.TraceInformation("Tried to copy this file: {0}\\{1}", CurrentLocation, CurrentFile.Name);
+
+                            Log.Source.TraceInformation("Far.Api.Panel2.IsPlugin = {0}", Far.Api.Panel2.IsPlugin ? "true" : "false");
+                            Log.Source.TraceInformation("Far.Api.Panel2.CurrentFile = {0}", Far.Api.Panel2.CurrentFile);
+                            Log.Source.TraceInformation("Far.Api.Panel2.CurrentDirectory = {0}", Far.Api.Panel2.CurrentDirectory);
+
+                            if (Far.Api.Panel2.IsPlugin)
+                            {
+                                // How to copy files to plugins??
+                                return true;
+                            }
+
+                            if (Far.Api.Panel2.CurrentDirectory == null)
+                            {
+                                // how can it be?
+                                return true;
+                            }
+
+                            var item = ((CurrentFile.Data as Hashtable)["fsitem"] as FSItem);
+                            var path = Path.Combine(Far.Api.Panel2.CurrentDirectory, item.Name);
+
+                            var form = new Tools.ProgressForm();
+                            form.Activity = "Downloading...";
+                            form.Title = "Amazon Cloud Drive - File Download Progress";
+                            form.CanCancel = true;
+                            form.SetProgressValue(0, item.Length);
+                            form.Canceled += (object sender, EventArgs e) =>
+                            {
+                                form.Close();
+                            };
+
+                            Task task = (Explorer as ACDExplorer).Client.DownloadFile(item, path, form);
+                            var cs = new CancellationTokenSource();
+                            var token = cs.Token;
+                            /*
+                            token.Register(() =>
+                            {
+                                form.Close();
+                            });*/
+                            var _task = Task.Factory.StartNew(() =>
+                            {
+                                form.Show();
+                            }, token);
+                            task.Wait();
+
                             break;
                         }
 

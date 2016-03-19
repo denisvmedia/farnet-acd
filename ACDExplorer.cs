@@ -27,7 +27,7 @@ namespace FarNet.ACD
         {
             if (args == null) return null;
 
-            var path = ((FSItem)((Hashtable)Panel.CurrentFile.Data)["fsitem"]).Path;
+            var path = ((Panel.CurrentFile.Data as Hashtable)["fsitem"] as FSItem).Path;
 
             return Explore(path);
         }
@@ -62,7 +62,12 @@ namespace FarNet.ACD
             return Client.GetFiles(path);
         }
 
-		public override Panel CreatePanel()
+        public override void AcceptFiles(AcceptFilesEventArgs args)
+        {
+            if (args != null) args.Result = JobResult.Ignore;
+        }
+
+        public override Panel CreatePanel()
 		{
 			Panel = new ACDPanel(this);
             return Panel;

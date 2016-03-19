@@ -152,6 +152,30 @@ namespace FarNet.ACD
             return items;
         }
 
+        public async Task DownloadFile(FSItem item, string dest, Tools.ProgressForm form)
+        {
+            var fs = new FileStream(dest, FileMode.OpenOrCreate);
+
+            //int prevProgress = 0;
+
+            var totalBytes = Utility.BytesToString(item.Length);
+            await amazon.Files.Download(item.Id, fs, null, null, 4096, (long position) =>
+            {
+                if (form.IsClosed)
+                {
+                    return -1;
+                }
+                //Log.Source.TraceInformation("Progress: {0}", progress);
+                form.Activity = string.Format("{0} ({1}/{2})", item.Name, Utility.BytesToString(position), totalBytes);
+                form.SetProgressValue(position, item.Length);
+                return position;
+            });
+
+            fs.Close();
+
+            form.Complete();
+        }
+
         /// <summary>
         /// TODO
         /// </summary>
