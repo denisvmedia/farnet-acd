@@ -35,8 +35,6 @@ namespace FarNet.ACD
             Dialog.Show();
         }
 
-        //const string TracingFile = "FarNet.ACD.tracing";
-        //static TextWriterTraceListener _Listener;
         /// <summary>
         /// This method implements the menu tool action.
         /// </summary>

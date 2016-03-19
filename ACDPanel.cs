@@ -179,7 +179,8 @@ namespace FarNet.ACD
                         }
 
                         break;
-
+                        
+                    /*
                     case KeyCode.F5:
 
                         if (key.Is())
@@ -224,11 +225,11 @@ namespace FarNet.ACD
                             Task task = (Explorer as ACDExplorer).Client.DownloadFile(item, path, form);
                             var cs = new CancellationTokenSource();
                             var token = cs.Token;
-                            /*
+                            / *
                             token.Register(() =>
                             {
                                 form.Close();
-                            });*/
+                            });* /
                             var _task = Task.Factory.StartNew(() =>
                             {
                                 form.Show();
@@ -245,7 +246,7 @@ namespace FarNet.ACD
                         }
 
                         break;
-
+                    */
                     case KeyCode.PageDown:
 
                         if (key.IsCtrl())

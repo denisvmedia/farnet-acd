@@ -72,7 +72,7 @@ namespace FarNet.ACD
         /// </summary>
         /// <param name="itemPath"></param>
         /// <returns></returns>
-        private async Task<FSItem> FetchNode(string itemPath)
+        public async Task<FSItem> FetchNode(string itemPath)
         {
             //Far.Api.ShowError("Not implemented", new NotImplementedException("Not implemented: " + itemPath));
             if (itemPath == "\\" || itemPath == string.Empty)
@@ -152,26 +152,85 @@ namespace FarNet.ACD
             return items;
         }
 
+        /// <summary>
+        /// TODO
+        /// </summary>
+        /// <param name="item"></param>
+        /// <param name="dest"></param>
+        /// <param name="form"></param>
+        /// <returns></returns>
         public async Task DownloadFile(FSItem item, string dest, Tools.ProgressForm form)
         {
             var fs = new FileStream(dest, FileMode.OpenOrCreate);
 
-            //int prevProgress = 0;
-
             var totalBytes = Utility.BytesToString(item.Length);
-            await amazon.Files.Download(item.Id, fs, null, null, 4096, (long position) =>
+            try
             {
-                if (form.IsClosed)
+                await amazon.Files.Download(item.Id, fs, null, null, 4096, (long position) =>
                 {
-                    return -1;
-                }
-                //Log.Source.TraceInformation("Progress: {0}", progress);
-                form.Activity = string.Format("{0} ({1}/{2})", item.Name, Utility.BytesToString(position), totalBytes);
-                form.SetProgressValue(position, item.Length);
-                return position;
-            });
+                    if (form.IsClosed)
+                    {
+                        throw new OperationCanceledException();
+                    }
+                    //Log.Source.TraceInformation("Progress: {0}", progress);
+                    form.Activity = string.Format("{0} ({1}/{2})", item.Name, Utility.BytesToString(position), totalBytes);
+                    form.SetProgressValue(position, item.Length);
+                    return position;
+                });
+            }
+            catch (OperationCanceledException)
+            { }
+            /*
+            catch
+            {
+                // what to do in case of any other exception?
+            }
+            */
 
             fs.Close();
+
+            form.Complete();
+        }
+
+        /// <summary>
+        /// TODO
+        /// </summary>
+        /// <param name="item"></param>
+        /// <param name="src"></param>
+        /// <param name="form"></param>
+        /// <returns></returns>
+        public async Task UploadFile(FSItem item, string src, Tools.ProgressForm form)
+        {
+            var totalBytes = Utility.BytesToString(item.Length);
+            try
+            {
+                await amazon.Files.UploadNew(
+                    item.Id,
+                    src,
+                    () => new FileStream(src, FileMode.Open, FileAccess.Read, FileShare.ReadWrite, 4096, true),
+                    true,
+                    4096,
+                    (long position) => {
+                        if (form.IsClosed)
+                        {
+                            throw new OperationCanceledException();
+                        }
+                        //Log.Source.TraceInformation("Progress: {0}", progress);
+                        form.Activity = string.Format("{0} ({1}/{2})", Path.GetFileName(item.Name), Utility.BytesToString(position), totalBytes);
+                        form.SetProgressValue(position, item.Length);
+
+                        return position;
+                    }
+                );
+            }
+            catch (OperationCanceledException)
+            { }
+            /*
+            catch
+            {
+                // what to do in case of any other exception?
+            }
+            */
 
             form.Complete();
         }
@@ -191,6 +250,10 @@ namespace FarNet.ACD
             settings.Save();
         }
 
+        /// <summary>
+        /// TODO
+        /// </summary>
+        /// <returns></returns>
         public bool UIAuthenticate()
         {
             var cs = new CancellationTokenSource();
