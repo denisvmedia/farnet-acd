@@ -48,10 +48,6 @@
       <SpecificVersion>False</SpecificVersion>
       <HintPath>C:\Program Files\Far Manager\FarNet\FarNet.Tools.dll</HintPath>
     </Reference>
-    <Reference Include="Newtonsoft.Json, Version=8.0.0.0, Culture=neutral, PublicKeyToken=30ad4fe6b2a6aeed, processorArchitecture=MSIL">
-      <HintPath>packages\Newtonsoft.Json.8.0.2\lib\net45\Newtonsoft.Json.dll</HintPath>
-      <Private>True</Private>
-    </Reference>
     <Reference Include="System" />
     <Reference Include="System.Configuration" />
     <Reference Include="System.Data" />
@@ -68,10 +64,7 @@
     <Compile Include="Utility.cs" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="packages.config" />
-  </ItemGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\..\..\AmazonCloudDriveApi\AmazonCloudDriveApi\AmazonCloudDriveApi.csproj">
+    <ProjectReference Include="AmazonCloudDriveApi\AmazonCloudDriveApi\AmazonCloudDriveApi.csproj">
       <Project>{2c611335-3d92-492f-b3eb-2cf3955f63a1}</Project>
       <Name>AmazonCloudDriveApi</Name>
     </ProjectReference>
@@ -84,6 +77,6 @@
     <GenerateResource Sources="FarNet.ACD.restext;FarNet.ACD.ru.restext" OutputResources="Bin\$(Configuration)\FarNet.ACD.resources;Bin\$(Configuration)\FarNet.ACD.ru.resources" />
   </Target>
   <Target Name="AfterBuild" DependsOnTargets="Resources">
-    <Copy SourceFiles="@(Content);Bin\$(Configuration)\$(AssemblyName).dll;Bin\$(Configuration)\FarNet.ACD.resources;Bin\$(Configuration)\FarNet.ACD.ru.resources" DestinationFolder="$(Install)\$(AssemblyName)" SkipUnchangedFiles="true" />
+    <Copy SourceFiles="@(Content);Bin\$(Configuration)\$(AssemblyName).dll;Bin\$(Configuration)\AmazonCloudDriveApi.dll;;Bin\$(Configuration)\Newtonsoft.Json.dll;Bin\$(Configuration)\FarNet.ACD.resources;Bin\$(Configuration)\FarNet.ACD.ru.resources" DestinationFolder="$(Install)\$(AssemblyName)" SkipUnchangedFiles="true" />
   </Target>
 </Project>

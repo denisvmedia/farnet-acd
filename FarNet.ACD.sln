@@ -14,7 +14,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 		FarNet.ACD.ru.restext = FarNet.ACD.ru.restext
 	EndProjectSection
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AmazonCloudDriveApi", "..\..\..\AmazonCloudDriveApi\AmazonCloudDriveApi\AmazonCloudDriveApi.csproj", "{2C611335-3D92-492F-B3EB-2CF3955F63A1}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AmazonCloudDriveApi", "AmazonCloudDriveApi\AmazonCloudDriveApi\AmazonCloudDriveApi.csproj", "{2C611335-3D92-492F-B3EB-2CF3955F63A1}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
