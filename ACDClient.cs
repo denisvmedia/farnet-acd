@@ -161,11 +161,9 @@ namespace FarNet.ACD
         /// <returns></returns>
         public async Task DownloadFile(FSItem item, string dest, Tools.ProgressForm form)
         {
-            var fs = new FileStream(dest, FileMode.OpenOrCreate);
-
-            var totalBytes = Utility.BytesToString(item.Length);
-            try
+            using (var fs = new FileStream(dest, FileMode.OpenOrCreate))
             {
+                var totalBytes = Utility.BytesToString(item.Length);
                 await amazon.Files.Download(item.Id, fs, null, null, 4096, (long position) =>
                 {
                     if (form.IsClosed)
@@ -178,18 +176,6 @@ namespace FarNet.ACD
                     return position;
                 });
             }
-            catch (OperationCanceledException)
-            { }
-            /*
-            catch
-            {
-                // what to do in case of any other exception?
-            }
-            */
-
-            fs.Close();
-
-            form.Complete();
         }
 
         /// <summary>
@@ -209,6 +195,14 @@ namespace FarNet.ACD
             fileUpload.ParentId = item.Id;
             fileUpload.FileName = filename;
             fileUpload.StreamOpener = () => new FileStream(src, FileMode.Open, FileAccess.Read, FileShare.ReadWrite, 4096, true);
+            fileUpload.Progress = (long position) =>
+            {
+                //Log.Source.TraceInformation("Progress: {0}", progress);
+                form.Activity = string.Format("{0} ({1}/{2})", filename, Utility.BytesToString(position), totalBytes);
+                form.SetProgressValue(position, itemLength);
+
+                return position;
+            };
             var cs = new CancellationTokenSource();
             var token = cs.Token;
             fileUpload.CancellationToken = token;
@@ -218,21 +212,6 @@ namespace FarNet.ACD
             };
 
             await amazon.Files.UploadNew(fileUpload);
-                /*
-                4096,
-                (long position) => {
-                    if (form.IsClosed)
-                    {
-                        throw new OperationCanceledException();
-                    }
-                    //Log.Source.TraceInformation("Progress: {0}", progress);
-                    form.Activity = string.Format("{0} ({1}/{2})", filename, Utility.BytesToString(position), totalBytes);
-                    form.SetProgressValue(position, itemLength);
-
-                    return position;
-                }*/
-
-            //form.Complete();
         }
 
         /// <summary>

@@ -61,6 +61,12 @@ namespace FarNet.ACD
             return Client.GetFiles(path);
         }
 
+        /// <summary>
+        /// Progress Form builder
+        /// </summary>
+        /// <param name="activity">Current activity description (form text)</param>
+        /// <param name="title">Form title</param>
+        /// <returns></returns>
         private Tools.ProgressForm GetProgressForm(string activity, string title)
         {
             var form = new Tools.ProgressForm();
@@ -70,6 +76,7 @@ namespace FarNet.ACD
             form.Canceled += (object sender, EventArgs e) =>
             {
                 form.Close();
+                // we cannot throw and exception here, since it is another thread
                 //throw new OperationCanceledException();
             };
 
@@ -88,7 +95,6 @@ namespace FarNet.ACD
             if (args != null) args.Result = JobResult.Ignore;
 
             //Log.Source.TraceInformation("Progress: {0}", args.Files[0].Name);
-            //Log.Source.TraceInformation("Current directory: {0}", Far.Api.Panel.CurrentFile.Name);
 
             if (string.IsNullOrWhiteSpace(Far.Api.Panel2.CurrentDirectory))
             {
@@ -160,39 +166,49 @@ namespace FarNet.ACD
             }
 
             args.Result = JobResult.Incomplete;
+            var form = GetProgressForm("Downloading...", "Amazon Cloud Drive - File Download Progress");
 
             foreach (var file in args.Files)
             {
                 var item = ((file.Data as Hashtable)["fsitem"] as FSItem);
                 var path = Path.Combine(Far.Api.Panel2.CurrentDirectory, item.Name);
 
-                var form = new Tools.ProgressForm();
-                form.Activity = "Downloading...";
-                form.Title = "Amazon Cloud Drive - File Download Progress";
-                form.CanCancel = true;
                 form.SetProgressValue(0, item.Length);
-                form.Canceled += (object sender, EventArgs e) =>
-                {
-                    form.Close();
-                };
 
-                Task task = Client.DownloadFile(item, path, form);
-                var cs = new CancellationTokenSource();
-                var token = cs.Token;
+                Task downloadTask = Client.DownloadFile(item, path, form);
+                try
+                {
+                    downloadTask.Wait();
+                }
+                catch (AggregateException ae)
+                {
+                    ae.Handle((x) =>
+                    {
+                        if (x is TaskCanceledException)
+                        {
+                            form.Complete();
+                            return true; // processed
+                        }
+                        return false; // unprocessed
+                    });
+                    break;
+                }
                 /*
-                token.Register(() =>
+                catch
                 {
-                    form.Close();
-                });*/
-                var _task = Task.Factory.StartNew(() =>
-                {
-                    form.Show();
-                }, token);
-                task.Wait();
+                    // what to do in case of any other exception?
+                }
+                */
             }
+            form.Complete();
 
             // TODO: handle somehow incomplete state
             args.Result = JobResult.Done;
+        }
+
+        private void Form_Canceled(object sender, EventArgs e)
+        {
+            throw new NotImplementedException();
         }
 
         /// <inheritdoc/>
