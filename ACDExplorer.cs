@@ -24,6 +24,7 @@ namespace FarNet.ACD
             Panel = panel;
             CanImportFiles = true;
             CanExportFiles = true;
+            CanDeleteFiles = true;
         }
 
         Explorer Explore(string location)
@@ -206,9 +207,49 @@ namespace FarNet.ACD
             args.Result = JobResult.Done;
         }
 
-        private void Form_Canceled(object sender, EventArgs e)
+        /// <inheritdoc/>
+        public override void DeleteFiles(DeleteFilesEventArgs args)
         {
-            throw new NotImplementedException();
+            if (args == null) return;
+            if (args != null) args.Result = JobResult.Ignore;
+
+            args.Result = JobResult.Incomplete;
+            var form = GetProgressForm("Deleting...", "Amazon Cloud Drive - File Deletion Progress");
+
+            foreach (var file in args.Files)
+            {
+                var item = ((file.Data as Hashtable)["fsitem"] as FSItem);
+                var path = Path.Combine(Far.Api.Panel2.CurrentDirectory, item.Name);
+
+                Task downloadTask = Client.DeleteFile(item, form);
+                try
+                {
+                    downloadTask.Wait();
+                }
+                catch (AggregateException ae)
+                {
+                    ae.Handle((x) =>
+                    {
+                        if (x is TaskCanceledException)
+                        {
+                            form.Complete();
+                            return true; // processed
+                        }
+                        return false; // unprocessed
+                    });
+                    break;
+                }
+                /*
+                catch
+                {
+                    // what to do in case of any other exception?
+                }
+                */
+            }
+            form.Complete();
+
+            // TODO: handle somehow incomplete state
+            args.Result = JobResult.Done;
         }
 
         /// <inheritdoc/>

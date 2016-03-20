@@ -182,6 +182,19 @@ namespace FarNet.ACD
         /// TODO
         /// </summary>
         /// <param name="item"></param>
+        /// <param name="dest"></param>
+        /// <param name="form"></param>
+        /// <returns></returns>
+        public async Task DeleteFile(FSItem item, Tools.ProgressForm form)
+        {
+            form.Activity = item.Name;
+            await amazon.Nodes.Trash(item.Id);
+        }
+
+        /// <summary>
+        /// TODO
+        /// </summary>
+        /// <param name="item"></param>
         /// <param name="src"></param>
         /// <param name="form"></param>
         /// <returns></returns>
