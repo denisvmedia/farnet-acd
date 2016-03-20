@@ -201,38 +201,38 @@ namespace FarNet.ACD
         /// <returns></returns>
         public async Task UploadFile(FSItem item, string src, Tools.ProgressForm form)
         {
-            var totalBytes = Utility.BytesToString(item.Length);
-            try
+            var itemLength = new FileInfo(src).Length;
+            var totalBytes = Utility.BytesToString(itemLength);
+            var filename = Path.GetFileName(src);
+            var fileUpload = new FileUpload();
+            fileUpload.AllowDuplicate = true;
+            fileUpload.ParentId = item.Id;
+            fileUpload.FileName = filename;
+            fileUpload.StreamOpener = () => new FileStream(src, FileMode.Open, FileAccess.Read, FileShare.ReadWrite, 4096, true);
+            var cs = new CancellationTokenSource();
+            var token = cs.Token;
+            fileUpload.CancellationToken = token;
+            form.Canceled += (object sender, EventArgs e) =>
             {
-                await amazon.Files.UploadNew(
-                    item.Id,
-                    src,
-                    () => new FileStream(src, FileMode.Open, FileAccess.Read, FileShare.ReadWrite, 4096, true),
-                    true,
-                    4096,
-                    (long position) => {
-                        if (form.IsClosed)
-                        {
-                            throw new OperationCanceledException();
-                        }
-                        //Log.Source.TraceInformation("Progress: {0}", progress);
-                        form.Activity = string.Format("{0} ({1}/{2})", Path.GetFileName(item.Name), Utility.BytesToString(position), totalBytes);
-                        form.SetProgressValue(position, item.Length);
+                cs.Cancel(true);
+            };
 
-                        return position;
+            await amazon.Files.UploadNew(fileUpload);
+                /*
+                4096,
+                (long position) => {
+                    if (form.IsClosed)
+                    {
+                        throw new OperationCanceledException();
                     }
-                );
-            }
-            catch (OperationCanceledException)
-            { }
-            /*
-            catch
-            {
-                // what to do in case of any other exception?
-            }
-            */
+                    //Log.Source.TraceInformation("Progress: {0}", progress);
+                    form.Activity = string.Format("{0} ({1}/{2})", filename, Utility.BytesToString(position), totalBytes);
+                    form.SetProgressValue(position, itemLength);
 
-            form.Complete();
+                    return position;
+                }*/
+
+            //form.Complete();
         }
 
         /// <summary>

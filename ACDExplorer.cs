@@ -61,9 +61,30 @@ namespace FarNet.ACD
             return Client.GetFiles(path);
         }
 
+        private Tools.ProgressForm GetProgressForm(string activity, string title)
+        {
+            var form = new Tools.ProgressForm();
+            form.Activity = activity;
+            form.Title = title;
+            form.CanCancel = true;
+            form.Canceled += (object sender, EventArgs e) =>
+            {
+                form.Close();
+                //throw new OperationCanceledException();
+            };
+
+            var _task = Task.Factory.StartNew(() =>
+            {
+                form.Show();
+            });
+
+            return form;
+        }
+
         /// <inheritdoc/>
         public override void ImportFiles(ImportFilesEventArgs args)
         {
+            if (args == null) return;
             if (args != null) args.Result = JobResult.Ignore;
 
             //Log.Source.TraceInformation("Progress: {0}", args.Files[0].Name);
@@ -81,56 +102,64 @@ namespace FarNet.ACD
                 return;
             }
 
-            var item = task.Result;
+            args.Result = JobResult.Incomplete;
+
+            var form = GetProgressForm("Uploading...", "Amazon Cloud Drive - File Upload Progress");
+            form.SetProgressValue(0, task.Result.Length);
 
             foreach (var file in args.Files)
             {
-                //var path = Path.Combine(Far.Api.Panel2.CurrentDirectory, item.Name);
+                Task uploadTask = Client.UploadFile(task.Result, Path.Combine(Far.Api.Panel.CurrentDirectory, file.Name), form);
 
-                var form = new Tools.ProgressForm();
-                form.Activity = "Uploading...";
-                form.Title = "Amazon Cloud Drive - File Upload Progress";
-                form.CanCancel = true;
-                form.SetProgressValue(0, item.Length);
-                form.Canceled += (object sender, EventArgs e) =>
+                try
                 {
-                    form.Close();
-                };
-
-                Task uploadTask = Client.UploadFile(item, Path.Combine(Far.Api.Panel.CurrentDirectory, file.Name), form);
-                var cs = new CancellationTokenSource();
-                var token = cs.Token;
+                    uploadTask.Wait();
+                }
+                catch (AggregateException ae)
+                {
+                    ae.Handle((x) =>
+                    {
+                        if (x is TaskCanceledException)
+                        {
+                            form.Complete();
+                            return true; // processed
+                        }
+                        return false; // unprocessed
+                    });
+                    break;
+                }
                 /*
-                token.Register(() =>
+                catch
                 {
-                    form.Close();
-                });*/
-                var _task = Task.Factory.StartNew(() =>
-                {
-                    form.Show();
-                }, token);
-                uploadTask.Wait();
+                    // what to do in case of any other exception?
+                }
+                */
             }
+            form.Complete();
+
+            // TODO: handle somehow incomplete state
+            args.Result = JobResult.Done;
         }
 
         /// <inheritdoc/>
         public override void ExportFiles(ExportFilesEventArgs args)
         {
+            if (args == null) return;
             if (args != null) args.Result = JobResult.Ignore;
 
             if (Far.Api.Panel2.IsPlugin)
             {
                 // How to copy files to plugins??
-                args.Result = JobResult.Ignore;
                 return;
             }
 
             if (Far.Api.Panel2.CurrentDirectory == null)
             {
                 // how can it be?
-                args.Result = JobResult.Ignore;
                 return;
             }
+
+            args.Result = JobResult.Incomplete;
 
             foreach (var file in args.Files)
             {
@@ -161,6 +190,9 @@ namespace FarNet.ACD
                 }, token);
                 task.Wait();
             }
+
+            // TODO: handle somehow incomplete state
+            args.Result = JobResult.Done;
         }
 
         /// <inheritdoc/>
