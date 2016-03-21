@@ -159,13 +159,14 @@ namespace FarNet.ACD
         /// <param name="dest"></param>
         /// <param name="form"></param>
         /// <returns></returns>
-        public async Task DownloadFile(FSItem item, string dest, Tools.ProgressForm form)
+        public async Task DownloadFile(FSItem item, string dest, Tools.ProgressForm form, EventWaitHandle wh)
         {
             using (var fs = new FileStream(dest, FileMode.OpenOrCreate))
             {
                 var totalBytes = Utility.BytesToString(item.Length);
                 await amazon.Files.Download(item.Id, fs, null, null, 4096, (long position) =>
                 {
+                    wh.WaitOne();
                     if (form.IsClosed)
                     {
                         throw new OperationCanceledException();
@@ -198,7 +199,7 @@ namespace FarNet.ACD
         /// <param name="src"></param>
         /// <param name="form"></param>
         /// <returns></returns>
-        public async Task UploadFile(FSItem item, string src, Tools.ProgressForm form)
+        public async Task UploadFile(FSItem item, string src, Tools.ProgressForm form, EventWaitHandle wh)
         {
             var itemLength = new FileInfo(src).Length;
             var totalBytes = Utility.BytesToString(itemLength);
@@ -210,6 +211,7 @@ namespace FarNet.ACD
             fileUpload.StreamOpener = () => new FileStream(src, FileMode.Open, FileAccess.Read, FileShare.ReadWrite, 4096, true);
             fileUpload.Progress = (long position) =>
             {
+                wh.WaitOne();
                 //Log.Source.TraceInformation("Progress: {0}", progress);
                 form.Activity = string.Format("{0} ({1}/{2})", filename, Utility.BytesToString(position), totalBytes);
                 form.SetProgressValue(position, itemLength);

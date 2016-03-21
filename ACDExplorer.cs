@@ -84,6 +84,29 @@ namespace FarNet.ACD
             return form;
         }
 
+        /// <summary>
+        /// Reset Event that is used to pause threads
+        /// </summary>
+        /// <param name="message"></param>
+        /// <returns></returns>
+        private ManualResetEvent GetResetEvent(string message, string title, Tools.ProgressForm form)
+        {
+            var wh = new ManualResetEvent(true); // start in a signaled way, i.e. resumed state
+            form.Canceling += (object sender, Forms.ClosingEventArgs cancelArgs) =>
+            {
+                wh.Reset(); // pause Upload
+
+                if (Far.Api.Message(message, title, MessageOptions.YesNo | MessageOptions.Warning) != 0)
+                {
+                    cancelArgs.Ignore = true;
+                }
+
+                wh.Set(); // resume Upload
+            };
+
+            return wh;
+        }
+
         /// <inheritdoc/>
         public override void ImportFiles(ImportFilesEventArgs args)
         {
@@ -116,12 +139,13 @@ namespace FarNet.ACD
             args.Result = JobResult.Incomplete;
 
             var form = GetProgressForm("Uploading...", "Amazon Cloud Drive - File Upload Progress");
+            var wh = GetResetEvent("Do you wish to interrupt upload?", "Upload", form);
 
-            var _jobThread = new Thread(() =>
+            var jobThread = new Thread(() =>
             {
                 foreach (var file in args.Files)
                 {
-                    Task uploadTask = Client.UploadFile(task.Result, Path.Combine(Far.Api.Panel.CurrentDirectory, file.Name), form);
+                    Task uploadTask = Client.UploadFile(task.Result, Path.Combine(Far.Api.Panel.CurrentDirectory, file.Name), form, wh);
 
                     try
                     {
@@ -149,9 +173,10 @@ namespace FarNet.ACD
                 }
                 form.Complete();
             });
+
+            jobThread.Start();
             // wait a little bit
             Thread.Sleep(500);
-            _jobThread.Start();
             form.Show();
 
             // TODO: handle somehow incomplete state
@@ -178,8 +203,9 @@ namespace FarNet.ACD
 
             args.Result = JobResult.Incomplete;
             var form = GetProgressForm("Downloading...", "Amazon Cloud Drive - File Download Progress");
+            var wh = GetResetEvent("Do you wish to interrupt download?", "Download", form);
 
-            var _jobThread = new Thread(() =>
+            var jobThread = new Thread(() =>
             {
                 foreach (var file in args.Files)
                 {
@@ -188,7 +214,7 @@ namespace FarNet.ACD
 
                     form.SetProgressValue(0, item.Length);
 
-                    Task downloadTask = Client.DownloadFile(item, path, form);
+                    Task downloadTask = Client.DownloadFile(item, path, form, wh);
 
                     try
                     {
@@ -216,9 +242,10 @@ namespace FarNet.ACD
                 }
                 form.Complete();
             });
+
+            jobThread.Start();
             // wait a little bit
             Thread.Sleep(500);
-            _jobThread.Start();
             form.Show();
 
             // TODO: handle somehow incomplete state
@@ -265,7 +292,7 @@ namespace FarNet.ACD
 
             var form = GetProgressForm("Deleting...", "Amazon Cloud Drive - File Deletion Progress");
 
-            var _jobThread = new Thread(() =>
+            var jobThread = new Thread(() =>
             {
                 foreach (var file in args.Files)
                 {
@@ -300,9 +327,9 @@ namespace FarNet.ACD
                 form.Complete();
             });
 
+            jobThread.Start();
             // wait a little bit
             Thread.Sleep(500);
-            _jobThread.Start();
             form.Show();
 
             // TODO: handle somehow incomplete state
