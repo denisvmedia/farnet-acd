@@ -4,7 +4,6 @@ Experimental Amazon Cloud Drive FarNet module
 ## TODO
 * F6 support from and to the module panel
 * Shift-F6 support
-* F7 support
 * F3/Shift-F3 support
 * Directory size calculation support
 * F4/Shift-F4 support

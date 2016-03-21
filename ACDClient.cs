@@ -196,6 +196,37 @@ namespace FarNet.ACD
         /// TODO
         /// </summary>
         /// <param name="item"></param>
+        /// <param name="dest"></param>
+        /// <param name="form"></param>
+        /// <returns></returns>
+        public async Task<FSItem> CreateDirectory(string filePath)
+        {
+            if (filePath == "\\" || filePath == ".." || filePath == ".")
+            {
+                return null;
+            }
+            var dir = Path.GetDirectoryName(filePath);
+            if (dir == ".." || dir == ".")
+            {
+                return null;
+            }
+            var dirNode = FetchNode(dir).Result;
+            if (dirNode == null)
+            {
+                return null;
+            }
+
+            var name = Path.GetFileName(filePath);
+            var node = await amazon.Nodes.CreateFolder(dirNode.Id, name);
+            var item = FSItem.FromNode(filePath, node);
+
+            return item;
+        }
+
+        /// <summary>
+        /// TODO
+        /// </summary>
+        /// <param name="item"></param>
         /// <param name="src"></param>
         /// <param name="form"></param>
         /// <returns></returns>
@@ -309,20 +340,34 @@ namespace FarNet.ACD
             var items = itemsData.Result;
             foreach (var item in items)
             {
-                SetFile file = new SetFile();
-                file.Name = item.Name;
-                file.Description = item.Id;
-                file.IsDirectory = item.IsDir;
-                file.LastAccessTime = item.LastAccessTime;
-                file.LastWriteTime = item.LastWriteTime;
-                file.Length = item.Length;
-                file.CreationTime = item.CreationTime;
-                file.Data = new Hashtable();
-                ((Hashtable)file.Data).Add("fsitem", item);
+                var file = GetFarFileFromFSItem(item);
                 Files.Add(file);
             }
 
             return Files;
+        }
+
+        /// <summary>
+        /// Get FarFile wrapper for FSItem
+        /// </summary>
+        /// <param name="item"></param>
+        /// <returns></returns>
+        public FarFile GetFarFileFromFSItem(FSItem item)
+        {
+            SetFile file = new SetFile()
+            {
+                Name = item.Name,
+                Description = item.Id,
+                IsDirectory = item.IsDir,
+                LastAccessTime = item.LastAccessTime,
+                LastWriteTime = item.LastWriteTime,
+                Length = item.Length,
+                CreationTime = item.CreationTime,
+                Data = new Hashtable(),
+            };
+            ((Hashtable)file.Data).Add("fsitem", item);
+
+            return file;
         }
     }
 }

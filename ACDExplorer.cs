@@ -25,6 +25,7 @@ namespace FarNet.ACD
             CanImportFiles = true;
             CanExportFiles = true;
             CanDeleteFiles = true;
+            CanCreateFile = true;
         }
 
         Explorer Explore(string location)
@@ -252,6 +253,77 @@ namespace FarNet.ACD
             args.Result = JobResult.Done;
         }
 
+        /// <inheritdoc/>
+        public override void CreateFile(CreateFileEventArgs args)
+        {
+            if (args == null) return;
+            if (args != null) args.Result = JobResult.Ignore;
+
+            args.Result = JobResult.Incomplete;
+
+            var list = new List<string>(1);
+            list.Add("Folder name:");
+            var dlg = new InputDialog()
+            {
+                Prompt = list,
+                Caption = "Create folder",
+                //Text = "",
+            };
+
+            if (!dlg.Show())
+            {
+                args.Result = JobResult.Ignore;
+                return;
+            }
+
+            var path = Path.Combine(Far.Api.Panel.CurrentDirectory, dlg.Text);
+            Task<FSItem> mdTask = Client.CreateDirectory(path);
+
+            var form = GetProgressForm("Creating the directory...", "Amazon Cloud Drive - Create Directory");
+            form.CanCancel = false;
+            var jobThread = new Thread(() =>
+            {
+                try
+                {
+                    mdTask.Wait();
+                    if (mdTask.Result != null)
+                    {
+                        args.Result = JobResult.Done;
+                        args.PostFile = Client.GetFarFileFromFSItem(mdTask.Result);
+                        using (var wh = new ManualResetEvent(false))
+                        {
+                            wh.WaitOne(3000);
+                        }
+                        form.Complete();
+                    }
+                    else
+                    {
+                        form.Close();
+                    }
+                }
+                catch
+                {
+                    form.Close();
+                }
+            });
+            jobThread.Start();
+            form.Show();
+            if (form.IsCompleted)
+            {
+                Panel.NeedsNewFiles = true;
+                Panel.Redraw();
+                return;
+            }
+            Far.Api.Message(new MessageArgs()
+            {
+                Text = "Cannot create a folder",
+                Caption = "Error",
+                Options = MessageOptions.Warning,
+            });
+            args.Result = JobResult.Ignore;
+        }
+
+        /// <inheritdoc/>
         public override void GetContent(GetContentEventArgs args)
         {
             if (args == null) return;
