@@ -116,7 +116,6 @@ namespace FarNet.ACD
             args.Result = JobResult.Incomplete;
 
             var form = GetProgressForm("Uploading...", "Amazon Cloud Drive - File Upload Progress");
-            form.SetProgressValue(0, task.Result.Length);
 
             var _jobThread = new Thread(() =>
             {
