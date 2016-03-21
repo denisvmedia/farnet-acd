@@ -26,6 +26,7 @@ namespace FarNet.ACD
             CanExportFiles = true;
             CanDeleteFiles = true;
             CanCreateFile = true;
+            CanRenameFile = true;
         }
 
         Explorer Explore(string location)
@@ -405,6 +406,44 @@ namespace FarNet.ACD
             form.Show();
 
             // TODO: handle somehow incomplete state
+            args.Result = JobResult.Done;
+        }
+
+        /// <inheritdoc/>
+        public override void RenameFile(RenameFileEventArgs args)
+        {
+            if (args == null) return;
+            if (args != null) args.Result = JobResult.Ignore;
+
+            var item = ((args.File.Data as Hashtable)["fsitem"] as FSItem);
+            IInputBox input = Far.Api.CreateInputBox();
+            input.EmptyEnabled = true;
+            input.Title = "Rename";
+            input.Prompt = "New name";
+            input.History = "Copy";
+            input.Text = args.File.Name;
+            input.ButtonsAreVisible = true;
+            if (!input.Show() || input.Text == args.File.Name || string.IsNullOrEmpty(input.Text))
+            {
+                return;
+            }
+            // set new name and post it
+            args.Parameter = input.Text;
+            args.PostName = input.Text;
+
+            Task<bool> task = Client.RenameFile(item, input.Text);
+            task.Wait();
+
+            if (!task.Result)
+            {
+                Far.Api.Message(new MessageArgs()
+                {
+                    Text = "Cannot rename the file",
+                    Caption = "Error",
+                    Options = MessageOptions.Warning,
+                });
+            }
+
             args.Result = JobResult.Done;
         }
 

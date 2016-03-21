@@ -2,6 +2,8 @@
 using System.Text;
 using System.Reflection;
 using System.Collections;
+using System.IO;
+using System.Linq;
 
 namespace FarNet.ACD
 {
@@ -118,6 +120,39 @@ namespace FarNet.ACD
             }
 
             return result.ToString();
+        }
+
+        /// <summary>
+        /// Checks the given string for being (apparently) a valid filename
+        /// </summary>
+        /// <param name="testName">Filename to test</param>
+        /// <returns></returns>
+        public static bool IsValidFilename(string testName)
+        {
+            return !string.IsNullOrEmpty(testName) && testName.IndexOfAny(Path.GetInvalidFileNameChars()) < 0;
+        }
+
+        /// <summary>
+        /// Checks the given string for being (apparently) a valid pathname
+        /// </summary>
+        /// <param name="testName">Pathname to test</param>
+        /// <returns></returns>
+        public static bool IsValidPathname(string testName)
+        {
+            return !string.IsNullOrEmpty(testName) && testName.IndexOfAny(Path.GetInvalidPathChars()) < 0;
+        }
+
+        /// <summary>
+        /// Generates random string
+        /// Source: http://stackoverflow.com/questions/1344221/how-can-i-generate-random-alphanumeric-strings-in-c
+        /// </summary>
+        /// <param name="length"></param>
+        /// <returns></returns>
+        public static string RandomString(int length, string chars = "abcdefghijklmnopqrstuvwxyz0123456789")
+        {
+            var random = new Random();
+            return new string(Enumerable.Repeat(chars, length)
+              .Select(s => s[random.Next(s.Length)]).ToArray());
         }
     }
 }

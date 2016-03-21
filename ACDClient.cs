@@ -260,6 +260,104 @@ namespace FarNet.ACD
             await amazon.Files.UploadNew(fileUpload);
         }
 
+        public async Task<bool> MoveFile(FSItem item, string newParent)
+        {
+            if (!Utility.IsValidPathname(newParent))
+            {
+                return false;
+            }
+
+            var newParentNode = FetchNode(newParent).Result;
+
+            return await MoveFile(item, newParentNode);
+        }
+
+        public async Task<bool> MoveFile(FSItem item, FSItem newParentNode)
+        {
+            if (newParentNode == null)
+            {
+                return false; // TODO: throw an exception
+            }
+
+            if (!newParentNode.IsDir)
+            {
+                return false; // TODO: throw an exception
+            }
+
+            await amazon.Nodes.Move(item.Id, item.ParentIds.First(), newParentNode.Id);
+
+            return true;
+        }
+
+        /// <summary>
+        /// TODO
+        /// </summary>
+        /// <param name="item"></param>
+        /// <param name="newName"></param>
+        /// <returns></returns>
+        public async Task<bool> RenameFile(FSItem item, string newName)
+        {
+            if (!Utility.IsValidPathname(newName))
+            {
+                return false; // TODO: throw an exception
+            }
+
+            // 1. Is newName a folder?
+            var newParentNode = FetchNode(newName).Result;
+            if (newParentNode != null)
+            {
+                return await MoveFile(item, newParentNode);
+            }
+
+            // 2. Is newName a file in the same dir?
+            var destination = Path.GetDirectoryName(newName);
+            // 2.1 Is destination empty? (means that the file is in the current folder)
+            if (destination == "")
+            {
+                await amazon.Nodes.Rename(item.Id, newName);
+                return true;
+            }
+
+            // 2.1.1 If destination (destination) node does not exist or is not a directory, we should fail
+            var destinationNode = FetchNode(destination).Result;
+            if (destinationNode == null || !destinationNode.IsDir)
+            {
+                return false; // TODO: throw exception
+            }
+
+            // 2.2 Is destination the same as the directory name of the item?
+            var filename = Path.GetFileName(newName);
+            if (destination == item.Dir)
+            {
+                await amazon.Nodes.Rename(item.Id, filename);
+                return true;
+            }
+
+            // 3. Is newName is another folder AND filename? (the only remaining option)
+            //    Here we have 2 problems (because of no way to move and rename atomically):
+            //    1) If we first rename and then move, then it might happen so that there is a file with the same name in the current folder
+            //    2) Similar problem can be if first move and then rename
+            //    Solution? We have it.
+            //    1) We should first rename to something unique (say, filename.randomstr.ext) and most likely we will not get a conflict
+            //    2) We move the file with this unique name
+            //    3) We _try_ to rename back to the original name
+            //    4) If we fail, we add (2), (3), (n) to the filename (i.e.: filename (n).ext)
+            //    5) If we still fail, we at least have the same file with the randomstr in the filename
+            var filenameWithoutExtension = Path.GetFileNameWithoutExtension(filename);
+            var extension = Path.GetExtension(filename);
+            var randomString = Utility.RandomString(8);
+            var tmpFilename = string.Format("{0}.{1}.{2}", filenameWithoutExtension, randomString, extension);
+
+            // 3.1 Rename to a temporary name
+            await amazon.Nodes.Rename(item.Id, tmpFilename);
+            // 3.2 Move to the new destination
+            await amazon.Nodes.Move(item.Id, item.ParentIds.First(), destinationNode.Id);
+            // 3.3 Rename back to the original name
+            await amazon.Nodes.Rename(item.Id, filename); // TODO: catch exceptions and try to rename again
+
+            return true;
+        }
+
         /// <summary>
         /// TODO
         /// </summary>

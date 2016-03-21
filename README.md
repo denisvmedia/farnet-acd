@@ -14,6 +14,7 @@ Experimental Amazon Cloud Drive FarNet module
 * Overwrite confirmation dialog
 
 ## Possible further extension
+* Caching support
 * Trash display
 * Support for untrashing files
 * Folder Tree display
