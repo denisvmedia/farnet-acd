@@ -9,6 +9,7 @@ using System.Collections;
 
 using Azi.Amazon.CloudDrive;
 using Azi.Amazon.CloudDrive.JsonObjects;
+using Newtonsoft.Json;
 
 namespace FarNet.ACD
 {
@@ -199,7 +200,7 @@ namespace FarNet.ACD
         /// <param name="dest"></param>
         /// <param name="form"></param>
         /// <returns></returns>
-        public async Task<FSItem> CreateDirectory(string filePath)
+        public async Task<FSItem> CreateDirectory(string filePath, bool allowExisting = true)
         {
             if (filePath == "\\" || filePath == ".." || filePath == ".")
             {
@@ -217,7 +218,37 @@ namespace FarNet.ACD
             }
 
             var name = Path.GetFileName(filePath);
-            var node = await amazon.Nodes.CreateFolder(dirNode.Id, name);
+            AmazonNode node = null;
+            string nodeId = null;
+
+            try
+            {
+                node = await amazon.Nodes.CreateFolder(dirNode.Id, name);
+            }
+            catch (Azi.Tools.HttpWebException x)
+            {
+                if (x.StatusCode == System.Net.HttpStatusCode.Conflict)
+                {
+                    if (!allowExisting)
+                    {
+                        throw x;
+                    }
+                    var resp = new StreamReader((x.InnerException as System.Net.WebException).Response.GetResponseStream()).ReadToEnd();
+
+                    dynamic obj = JsonConvert.DeserializeObject(resp);
+                    nodeId = obj.info.nodeId.Value;
+                }
+                else
+                {
+                    throw x;
+                }
+            }
+
+            if (nodeId != null) // in case of duplicate
+            {
+                node = await amazon.Nodes.GetNode(nodeId);
+            }
+
             var item = FSItem.FromNode(filePath, node);
 
             return item;
@@ -226,18 +257,18 @@ namespace FarNet.ACD
         /// <summary>
         /// TODO
         /// </summary>
-        /// <param name="item"></param>
+        /// <param name="parentItem"></param>
         /// <param name="src"></param>
         /// <param name="form"></param>
         /// <returns></returns>
-        public async Task UploadFile(FSItem item, string src, Tools.ProgressForm form, EventWaitHandle wh)
+        public async Task UploadNewFile(FSItem parentItem, string src, Tools.ProgressForm form, EventWaitHandle wh)
         {
             var itemLength = new FileInfo(src).Length;
             var totalBytes = Utility.BytesToString(itemLength);
             var filename = Path.GetFileName(src);
             var fileUpload = new FileUpload();
             fileUpload.AllowDuplicate = true;
-            fileUpload.ParentId = item.Id;
+            fileUpload.ParentId = parentItem.Id;
             fileUpload.FileName = filename;
             fileUpload.StreamOpener = () => new FileStream(src, FileMode.Open, FileAccess.Read, FileShare.ReadWrite, 4096, true);
             fileUpload.Progress = (long position) =>
@@ -258,6 +289,45 @@ namespace FarNet.ACD
             };
 
             await amazon.Files.UploadNew(fileUpload);
+        }
+
+        /// <summary>
+        /// TODO
+        /// </summary>
+        /// <param name="parentItem"></param>
+        /// <param name="src"></param>
+        /// <param name="form"></param>
+        /// <returns></returns>
+        public async Task ReplaceFile(FSItem parentItem, string src, Tools.ProgressForm form, EventWaitHandle wh)
+        {
+            var itemLength = new FileInfo(src).Length;
+            var totalBytes = Utility.BytesToString(itemLength);
+            var filename = Path.GetFileName(src);
+            var fileUpload = new FileUpload();
+            var cs = new CancellationTokenSource();
+            var token = cs.Token;
+            fileUpload.CancellationToken = token;
+            fileUpload.AllowDuplicate = true;
+            fileUpload.ParentId = parentItem.Id;
+            fileUpload.FileName = FetchNode(Path.Combine(parentItem.Path, filename)).Result.Id;
+            fileUpload.StreamOpener = () => new FileStream(src, FileMode.Open, FileAccess.Read, FileShare.ReadWrite, 4096, true);
+            fileUpload.Progress = (long position) =>
+            {
+                wh.WaitOne();
+                //Log.Source.TraceInformation("Progress: {0}", progress);
+                form.Activity = string.Format("{0} ({1}/{2})", filename, Utility.BytesToString(position), totalBytes);
+                form.SetProgressValue(position, itemLength);
+
+                return position;
+            };
+            form.Canceled += (object sender, EventArgs e) =>
+            {
+                cs.Cancel(true);
+            };
+
+            // for upload we need a node id to replace
+
+            await amazon.Files.Overwrite(fileUpload);
         }
 
         public async Task<bool> MoveFile(FSItem item, string newParent)

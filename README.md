@@ -11,7 +11,7 @@ Experimental Amazon Cloud Drive FarNet module
 * Partial file upload indication
 * Ask to delete or keep partially downloaded file
 * Support overwriting files when importing them
-* Overwrite confirmation dialog
+* Overwrite confirmation dialog during download
 
 ## Possible further extension
 * Caching support

@@ -4,6 +4,7 @@ using System.Reflection;
 using System.Collections;
 using System.IO;
 using System.Linq;
+using System.Collections.Generic;
 
 namespace FarNet.ACD
 {
@@ -153,6 +154,50 @@ namespace FarNet.ACD
             var random = new Random();
             return new string(Enumerable.Repeat(chars, length)
               .Select(s => s[random.Next(s.Length)]).ToArray());
+        }
+
+        /// <summary>
+        /// Recursively searches for files in a given directory
+        /// http://stackoverflow.com/a/929418/2102087
+        /// </summary>
+        /// <param name="path"></param>
+        /// <returns></returns>
+        public static IEnumerable<string> GetFiles(string path)
+        {
+            Queue<string> queue = new Queue<string>();
+            queue.Enqueue(path);
+            while (queue.Count > 0)
+            {
+                path = queue.Dequeue();
+                yield return path;
+                try
+                {
+                    foreach (string subDir in Directory.GetDirectories(path))
+                    {
+                        queue.Enqueue(subDir);
+                    }
+                }
+                catch (Exception)
+                {
+                    //Console.Error.WriteLine(ex);
+                }
+                string[] files = null;
+                try
+                {
+                    files = Directory.GetFiles(path);
+                }
+                catch (Exception)
+                {
+                    //Console.Error.WriteLine(ex);
+                }
+                if (files != null)
+                {
+                    for (int i = 0; i < files.Length; i++)
+                    {
+                        yield return files[i];
+                    }
+                }
+            }
         }
     }
 }
