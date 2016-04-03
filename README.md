@@ -12,6 +12,7 @@ Experimental Amazon Cloud Drive FarNet module
 * Ask to delete or keep partially downloaded file
 * Support overwriting files when importing them
 * Overwrite confirmation dialog during download
+* Proper Exception handling (at least prevent Far crashes)
 
 ## Possible further extension
 * Caching support
