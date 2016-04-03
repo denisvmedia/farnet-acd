@@ -199,5 +199,24 @@ namespace FarNet.ACD
                 }
             }
         }
+
+        /// <summary>
+        /// Shortens string putting placeholder in the middle of the string
+        /// </summary>
+        /// <param name="str"></param>
+        /// <param name="sideLen"></param>
+        /// <param name="placeholder"></param>
+        /// <returns></returns>
+        public static string ShortenString(string str, ushort sideLen, string placeholder = "...")
+        {
+            if (str.Length <= sideLen * 2)
+            {
+                return str;
+            }
+            var start = str.Substring(0, sideLen);
+            var end = str.Substring(str.Length - sideLen, sideLen);
+
+            return start + placeholder + end;
+        }
     }
 }

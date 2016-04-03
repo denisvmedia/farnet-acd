@@ -5,6 +5,7 @@ using System.IO;
 using System.Collections;
 using System.Threading.Tasks;
 using System.Threading;
+using FarNet.ACD.Exceptions;
 
 namespace FarNet.ACD
 {
@@ -13,6 +14,7 @@ namespace FarNet.ACD
     /// </summary>
     class ACDExplorer : Explorer
     {
+        const int MAX_UPLOAD_TRIES = 3;
         public readonly ACDClient Client;
         ACDPanel Panel;
 
@@ -116,42 +118,82 @@ namespace FarNet.ACD
         /// <param name="file"></param>
         /// <param name="parentItem"></param>
         /// <param name="form"></param>
-        private void DoUpload(FarFile file, FSItem parentItem, Tools.ProgressForm form, ManualResetEvent wh)
+        private long DoUpload(FarFile file, FSItem parentItem, Tools.ProgressForm form, ManualResetEvent wh, long progress, long maxprogress)
         {
-            Task uploadNewTask = Client.UploadNewFile(parentItem, file.Name, form, wh);
-
             Exception exists = null;
+            var ACDFilePath = Path.Combine(parentItem.Path, Path.GetFileName(file.Name));
 
-            try
+            Task<FSItem> item = Client.FetchNode(ACDFilePath);
+            item.Wait();
+            if (item.Result != null)
             {
-                uploadNewTask.Wait();
+                throw new RemoteFileExistsException("File exists " + ACDFilePath);
             }
-            catch (AggregateException ae)
+
+            for (var i = 0; i < MAX_UPLOAD_TRIES; i++)
             {
-                ae.Handle((x) =>
+                Task<long> uploadNewTask = Client.UploadNewFile(parentItem, file.Name, form, wh, progress, maxprogress);
+                Azi.Tools.HttpWebException webEx = null;
+
+                form.Activity += ".";
+
+                try
                 {
-                    if (x is TaskCanceledException)
+                    uploadNewTask.Wait();
+                    return uploadNewTask.Result;
+                }
+                catch (AggregateException ae)
+                {
+                    ae.Handle((x) =>
                     {
-                        return true; // processed
-                    }
+                        if (x is TaskCanceledException)
+                        {
+                            return true; // processed
+                        }
 
-                    if (x is Azi.Tools.HttpWebException && (x as Azi.Tools.HttpWebException).StatusCode == System.Net.HttpStatusCode.Conflict)
-                    {
-                        exists = x;
-                        return true; // processed
-                    }
+                        if (x is Azi.Tools.HttpWebException && (x as Azi.Tools.HttpWebException).StatusCode == System.Net.HttpStatusCode.Conflict)
+                        {
+                            exists = x;
+                            return true; // processed
+                        }
 
-                    // TODO: handle remaining types
-                    //exception = x;
+                        if (x is Azi.Tools.HttpWebException && (x as Azi.Tools.HttpWebException).StatusCode == System.Net.HttpStatusCode.InternalServerError)
+                        {
+                            webEx = (Azi.Tools.HttpWebException)x;
+                            return true;
+                        }
 
-                    return false; // unprocessed
-                });
+                        if (x is Azi.Tools.HttpWebException && (x as Azi.Tools.HttpWebException).StatusCode == System.Net.HttpStatusCode.ServiceUnavailable)
+                        {
+                            webEx = (Azi.Tools.HttpWebException)x;
+                            return true;
+                        }
+
+                        if (x is Azi.Tools.HttpWebException && (x as Azi.Tools.HttpWebException).StatusCode == System.Net.HttpStatusCode.GatewayTimeout)
+                        {
+                            webEx = (Azi.Tools.HttpWebException)x;
+                            return true;
+                        }
+
+                        // TODO: handle remaining types
+                        //exception = x;
+
+                        return false; // unprocessed
+                    });
+                }
+
+                if (webEx == null)
+                {
+                    break;
+                }
             }
 
             if (exists != null)
             {
-                throw exists;
+                throw new RemoteFileExistsException("File exists " + ACDFilePath, exists);
             }
+
+            return progress;
         }
 
         /// <summary>
@@ -160,13 +202,14 @@ namespace FarNet.ACD
         /// <param name="file"></param>
         /// <param name="parentItem"></param>
         /// <param name="form"></param>
-        private void DoReplace(FarFile file, FSItem parentItem, Tools.ProgressForm form, ManualResetEvent wh)
+        private long DoReplace(FarFile file, FSItem parentItem, Tools.ProgressForm form, ManualResetEvent wh, long progress, long maxprogress)
         {
-            Task replaceTask = Client.ReplaceFile(parentItem, file.Name, form, wh);
+            Task<long> replaceTask = Client.ReplaceFile(parentItem, file.Name, form, wh, progress, maxprogress);
 
             try
             {
                 replaceTask.Wait();
+                return replaceTask.Result;
             }
             catch (AggregateException ae)
             {
@@ -190,8 +233,15 @@ namespace FarNet.ACD
                     return false; // unprocessed
                 });
             }
+
+            return progress;
         }
 
+        /// <summary>
+        /// TODO
+        /// </summary>
+        /// <param name="Files"></param>
+        /// <returns></returns>
         private List<FarFile> GetFarFilesRecursive(IList<FarFile> Files)
         {
             List<FarFile> files = new List<FarFile>();
@@ -249,18 +299,22 @@ namespace FarNet.ACD
             args.Result = JobResult.Incomplete;
 
             var form = GetProgressForm("Uploading...", "Amazon Cloud Drive - File Upload Progress");
+            form.LineCount = 3;
 
-            // we use this event to pause upload thread if the file already exists
-            var replaceResetEvent = new ManualResetEvent(false);
+            // we use this event to pause upload thread
+            var pauseThreadEvent = new ManualResetEvent(false);
 
             // ACD file to be replaced
             FarFile fileToReplace = null;
 
             // indicates to the Form.Idled handler that we have a file that can be replaced
-            var replaceUserChoice = false;
+            int replaceUserChoice = -1;
 
             // File name to use with ACD
             string acdFileName = "";
+
+            // Exception that indicates failure in the thread
+            Exception failure = null;
 
             var jobThread = new Thread(() =>
             {
@@ -272,6 +326,14 @@ namespace FarNet.ACD
 
                 // list of directories that already exist on remote (for caching purposes)
                 Dictionary<string, FSItem> dirs = new Dictionary<string, FSItem>();
+                long progress = 0;
+                long maxprogress = 0;
+
+                foreach (var file in files)
+                {
+                    maxprogress += file.Length;
+                }
+                form.SetProgressValue(0, maxprogress);
 
                 foreach (var file in files)
                 {
@@ -283,7 +345,7 @@ namespace FarNet.ACD
                     // So, basically it's "Get OR Create Directory".
                     if (file.IsDirectory)
                     {
-                        form.Activity = "Creating directory " + acdFileName;
+                        form.Activity = "Creating directory " + Utility.ShortenString(acdFileName, 20);
                         Task<FSItem> mdTask = Client.CreateDirectory(acdFileName);
                         mdTask.Wait();
                         // let's cache it
@@ -302,7 +364,7 @@ namespace FarNet.ACD
                         else
                         {
                             // Fetch Node item for the current directory
-                            form.Activity = "Getting directory information " + parentAcdFileName;
+                            form.Activity = "Getting directory information " + Utility.ShortenString(parentAcdFileName, 20);
                             Task<FSItem> task = Client.FetchNode(parentAcdFileName);
                             task.Wait();
                             if (!task.IsCompleted || task.Result == null)
@@ -318,17 +380,17 @@ namespace FarNet.ACD
                         try
                         {
                             // trying to upload the file
-                            form.Activity = "Uploading " + Path.GetDirectoryName(acdFileName);
-                            DoUpload(file, parent, form, wh);
+                            form.Activity = "Uploading " + Utility.ShortenString(file.Name, 20);
+                            progress = DoUpload(file, parent, form, wh, progress, maxprogress);
                         }
-                        catch (Azi.Tools.HttpWebException) // thrown manually for 409 Conflict
+                        catch (RemoteFileExistsException) // thrown manually
                         {
                             // it might happen so that the file already exists
                             fileToReplace = file;
                             
                             // pause the thread until the user makes a decision
-                            replaceResetEvent.Reset();
-                            replaceResetEvent.WaitOne();
+                            pauseThreadEvent.Reset();
+                            pauseThreadEvent.WaitOne();
                         }
 
                         // Did the user decide to cancel upload?
@@ -337,16 +399,38 @@ namespace FarNet.ACD
                             break;
                         }
 
-                        // Did the user decide to replace the file?
-                        if (!replaceUserChoice)
+                        // Do we have a file to replace?
+                        if (fileToReplace == null)
                         {
                             continue;
                         }
 
-                        replaceUserChoice = false; // reset flag
+                        // reset var
+                        fileToReplace = null;
+
+                        // Check user decision on how to deal with file replacements
+                        switch (replaceUserChoice)
+                        {
+                            case -1: // escape
+                            case 1: // No
+                            case 3: // No to all
+                                progress += file.Length; // set progress to go futher if the file is skipped
+                                form.SetProgressValue(progress, maxprogress);
+                                continue;
+                        }
 
                         // finally replace the file
-                        DoReplace(file, parent, form, wh);
+                        try
+                        {
+                            progress = DoReplace(file, parent, form, wh, progress, maxprogress);
+                        }
+                        catch (Exception ex)
+                        {
+                            failure = ex;
+                            pauseThreadEvent.Reset();
+                            pauseThreadEvent.WaitOne();
+                            break;
+                        }
 
                         // Did the user decide to cancel upload (replace)?
                         if (form.IsCompleted)
@@ -363,26 +447,32 @@ namespace FarNet.ACD
             // here we check if there is a file that can be replaced
             form.Idled += (object sender, EventArgs e) =>
             {
+                if (failure != null) {
+                    var errorMsg = failure is AggregateException ? (failure as AggregateException).Flatten().ToString() : failure.ToString();
+                    Far.Api.Message("Unhandled exception during execution: " + errorMsg, "Upload error", MessageOptions.Ok | MessageOptions.Warning);
+                    pauseThreadEvent.Set();
+                    return;
+                }
+
                 // no file to replace => nothing to do
                 if (fileToReplace == null)
                 {
                     return;
                 }
 
-                if (Far.Api.Message(
-                    string.Format("Do you want to replace {0}?", acdFileName),
-                    "Upload",
-                    MessageOptions.YesNo | MessageOptions.Warning
-                ) == 0) // zero is yes
+                string[] buttons = new string[] { "&Yes", "&No", "Yes for &all", "No for all" };
+                if (replaceUserChoice != 2 && replaceUserChoice != 3)
                 {
-                    replaceUserChoice = true;
+                    replaceUserChoice = Far.Api.Message(
+                        string.Format("Do you want to replace {0}?", acdFileName),
+                        "Upload",
+                        MessageOptions.Warning,
+                        buttons
+                    );
                 }
 
-                // reset var
-                fileToReplace = null;
-
                 // unpause the thread
-                replaceResetEvent.Set();
+                pauseThreadEvent.Set();
             };
             jobThread.Start();
             // wait a little bit

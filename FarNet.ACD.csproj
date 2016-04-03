@@ -66,9 +66,12 @@
     <Compile Include="ACDExplorer.cs" />
     <Compile Include="ACDPanel.cs" />
     <Compile Include="ACDTool.cs" />
+    <Compile Include="Exceptions\RemoteFileExistsException.cs" />
+    <Compile Include="Exceptions\IOException.cs" />
     <Compile Include="FSItem.cs" />
     <Compile Include="ACDSettings.cs" />
     <Compile Include="InputDialog.cs" />
+    <Compile Include="Progress.cs" />
     <Compile Include="Utility.cs" />
   </ItemGroup>
   <ItemGroup>
