@@ -30,6 +30,7 @@ namespace FarNet.ACD
             CanCreateFile = true;
             CanRenameFile = true;
             CanGetContent = true;
+            CanExploreLocation = true;
         }
 
         Explorer Explore(string location)
@@ -40,6 +41,23 @@ namespace FarNet.ACD
             return newExplorer;
         }
 
+        public override Explorer ExploreLocation(ExploreLocationEventArgs args)
+        {
+            if (args == null) return null;
+
+            /*
+            SetFile farfile = new SetFile();
+            farfile.IsDirectory = true;
+            farfile.Length = 100;
+            farfile.Name = "Documents";
+
+            args.PostFile = farfile;
+
+            var explorer = base.ExploreLocation(args);
+            */
+
+            return Explore(Path.Combine(Panel.CurrentDirectory, args.Location));
+        }
 
         /// <inheritdoc/>
         public override Explorer ExploreDirectory(ExploreDirectoryEventArgs args)
@@ -339,6 +357,7 @@ namespace FarNet.ACD
                 {
                     // Get file name to use with ACD
                     acdFileName = Far.Api.Panel2.CurrentDirectory.TrimEnd('\\') + file.Name.Replace(Far.Api.Panel.CurrentDirectory, "");
+                    var parentAcdFileName = Path.GetDirectoryName(acdFileName);
 
                     // If a file is a directory, then we should try to create it.
                     // If the directory already exists, ClientCreateDirectory(...) internally will fetch that node.
@@ -346,14 +365,14 @@ namespace FarNet.ACD
                     if (file.IsDirectory)
                     {
                         form.Activity = "Creating directory " + Utility.ShortenString(acdFileName, 20);
-                        Task<FSItem> mdTask = Client.CreateDirectory(acdFileName);
+                        FSItem parent = dirs.ContainsKey(parentAcdFileName) ? dirs[parentAcdFileName] : null;
+                        Task <FSItem> mdTask = Client.CreateDirectory(acdFileName, parent);
                         mdTask.Wait();
                         // let's cache it
                         dirs.Add(acdFileName, mdTask.Result);
                     }
                     else
                     {
-                        var parentAcdFileName = Path.GetDirectoryName(acdFileName);
                         FSItem parent;
                         // if we have file's parent directory in our cache, then no need to fetch it again
                         // this also helps in cases when we create a directory on the remote, but it doesn't appear immediately
@@ -509,7 +528,8 @@ namespace FarNet.ACD
             {
                 foreach (var file in args.Files)
                 {
-                    var item = ((file.Data as Hashtable)["fsitem"] as FSItem);
+                    //var item = ((file.Data as Hashtable)["fsitem"] as FSItem);
+                    var item = CacheStorage.GetItem(file.Description); // description === Id
                     var path = Path.Combine(Far.Api.Panel2.CurrentDirectory, item.Name);
 
                     form.SetProgressValue(0, item.Length);
@@ -636,7 +656,8 @@ namespace FarNet.ACD
             var jobThread = new Thread(() =>
             {
                 var file = args.File;
-                var item = ((file.Data as Hashtable)["fsitem"] as FSItem);
+                //var item = ((file.Data as Hashtable)["fsitem"] as FSItem);
+                var item = CacheStorage.GetItem(file.Description); // description === Id
                 var path = args.FileName;
 
                 form.SetProgressValue(0, item.Length);

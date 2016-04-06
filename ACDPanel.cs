@@ -166,9 +166,20 @@ namespace FarNet.ACD
                         {
                             if (CurrentFile == null)
                             {
+                                UIExploreLocation(null);
                                 //UIViewAll();
                                 return true;
                             }
+
+                            /*
+                            if (CurrentFile.IsDirectory)
+                            {
+                                Explorer.CanExploreLocation = true;
+                                break;
+                            }
+
+                            Explorer.CanExploreLocation = false;
+                            */
                             break;
                         }
 

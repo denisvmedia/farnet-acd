@@ -200,7 +200,7 @@ namespace FarNet.ACD
         /// <param name="dest"></param>
         /// <param name="form"></param>
         /// <returns></returns>
-        public async Task<FSItem> CreateDirectory(string filePath, bool allowExisting = true)
+        public async Task<FSItem> CreateDirectory(string filePath, FSItem parent = null, bool allowExisting = true)
         {
             if (filePath == "\\" || filePath == ".." || filePath == ".")
             {
@@ -211,10 +211,14 @@ namespace FarNet.ACD
             {
                 return null;
             }
-            var dirNode = FetchNode(dir).Result;
-            if (dirNode == null)
+
+            if (parent == null)
             {
-                return null;
+                parent = FetchNode(dir).Result;
+                if (parent == null)
+                {
+                    return null;
+                }
             }
 
             var name = Path.GetFileName(filePath);
@@ -223,7 +227,7 @@ namespace FarNet.ACD
 
             try
             {
-                node = await amazon.Nodes.CreateFolder(dirNode.Id, name);
+                node = await amazon.Nodes.CreateFolder(parent.Id, name);
             }
             catch (Azi.Tools.HttpWebException x)
             {
@@ -550,6 +554,7 @@ namespace FarNet.ACD
                 Data = new Hashtable(),
             };
             ((Hashtable)file.Data).Add("fsitem", item);
+            CacheStorage.AddItem(item);
 
             return file;
         }

@@ -66,6 +66,7 @@
     <Compile Include="ACDExplorer.cs" />
     <Compile Include="ACDPanel.cs" />
     <Compile Include="ACDTool.cs" />
+    <Compile Include="CacheStorage.cs" />
     <Compile Include="Exceptions\RemoteFileExistsException.cs" />
     <Compile Include="Exceptions\IOException.cs" />
     <Compile Include="FSItem.cs" />
