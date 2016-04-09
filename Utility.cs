@@ -218,5 +218,100 @@ namespace FarNet.ACD
 
             return start + placeholder + end;
         }
+
+        /// <summary>
+        /// Wraps line to a given maxLength.
+        /// If the line is longer, inserts System.Environment.NewLine between the closest words.
+        /// </summary>
+        /// <param name="line"></param>
+        /// <param name="maxLength"></param>
+        /// <returns></returns>
+        public static string WrapLineToString(string line, int maxLength = 80)
+        {
+            return string.Join(Environment.NewLine, WrapLineToList(line, maxLength));
+        }
+
+        public static List<string> WrapLineToList(string line, int maxLength = 80)
+        {
+            var words = line.Split(' ');
+            var lines = words.Skip(1).Aggregate(words.Take(1).ToList(), (l, w) =>
+            {
+                if (l.Last().Length + w.Length >= maxLength)
+                    l.Add(w);
+                else
+                    l[l.Count - 1] += " " + w;
+                return l;
+            });
+            return lines;
+        }
+
+        /// <summary>
+        /// Ensures that the text width is not longer than maxLength
+        /// </summary>
+        /// <param name="text"></param>
+        /// <param name="maxLength"></param>
+        /// <returns></returns>
+        public static string WrapText(string text, int maxLength = 80)
+        {
+            var lines = StringToList(text);
+            var result = WrapText(lines, maxLength);
+
+            return string.Join(Environment.NewLine, result);
+        }
+
+        /// <summary>
+        /// Ensures that the text width is not longer than maxLength
+        /// </summary>
+        /// <param name="lines"></param>
+        /// <param name="maxLength"></param>
+        /// <param name="maxHeight"></param>
+        /// <returns></returns>
+        public static List<string> WrapText(List<string> lines, int maxLength = 80, int maxHeight = 24)
+        {
+            List<string> _lines = new List<string>();
+            foreach (var line in lines)
+            {
+                _lines.AddRange(WrapLineToList(line, maxLength));
+            }
+
+            var result = _lines.Take(maxHeight);
+
+            if (result.ElementAt(result.Count() - 1) == string.Empty) {
+                result = result.Take(result.Count() - 2);
+            }
+
+            return result.ToList();
+        }
+
+        /// <summary>
+        /// Gets the size of the longest line in the text
+        /// </summary>
+        /// <param name="text"></param>
+        /// <returns></returns>
+        public static int GetTextWidth(string text)
+        {
+            List<string> lines = text.Split(new[] { Environment.NewLine }, StringSplitOptions.None).ToList();
+            return GetTextWidth(lines);
+        }
+
+        /// <summary>
+        /// Gets the size of the longest line in the text
+        /// </summary>
+        /// <param name="text"></param>
+        /// <returns></returns>
+        public static int GetTextWidth(List<string> lines)
+        {
+            return lines.OrderByDescending(s => s.Length).First().Length;
+        }
+
+        /// <summary>
+        /// Gets the list of strings from the given string by splitting it to lines
+        /// </summary>
+        /// <param name="text"></param>
+        /// <returns></returns>
+        public static List<string> StringToList(string text)
+        {
+            return text.Split(new[] { Environment.NewLine }, StringSplitOptions.None).ToList();
+        }
     }
 }

@@ -21,6 +21,11 @@ namespace FarNet.ACD
     public sealed class ACDPanel : Panel
     {
         /// <summary>
+        /// Hack: let user hiding the dialog for the whole iteration
+        /// </summary>
+        public bool ShowRetryDialogInGetFiles = true;
+
+        /// <summary>
         /// The last user action.
         /// </summary>
         internal UserAction UserWants { get; set; }
@@ -332,9 +337,12 @@ namespace FarNet.ACD
             DoExplored((ACDExplorer)args.Explorer);
         }
 
+        /// <summary>
+        /// TODO
+        /// </summary>
+        /// <param name="explorer"></param>
         private void DoExplored(ACDExplorer explorer)
         {
-            //! path is used for Set-Location on Invoking()
             Title = "ACD: " + Explorer.Location;
             CurrentLocation = Explorer.Location;
             Log.Source.TraceInformation("Title: {0}; CurrentLocation: {1}", Title, CurrentLocation);

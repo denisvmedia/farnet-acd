@@ -45,17 +45,6 @@ namespace FarNet.ACD
         {
             if (args == null) return null;
 
-            /*
-            SetFile farfile = new SetFile();
-            farfile.IsDirectory = true;
-            farfile.Length = 100;
-            farfile.Name = "Documents";
-
-            args.PostFile = farfile;
-
-            var explorer = base.ExploreLocation(args);
-            */
-
             return Explore(Path.Combine(Panel.CurrentDirectory, args.Location));
         }
 
@@ -64,9 +53,11 @@ namespace FarNet.ACD
         {
             if (args == null) return null;
 
-            var path = ((Panel.CurrentFile.Data as Hashtable)["fsitem"] as FSItem).Path;
+            //var path = ((Panel.CurrentFile.Data as Hashtable)["fsitem"] as FSItem).Path;
+            //var item = CacheStorage.GetItemById(Panel.CurrentFile.Description); // description === Id
+            var item = Client.FetchNode(Path.Combine(Panel.CurrentDirectory, Panel.CurrentFile.Name)).Result;
 
-            return Explore(path);
+            return Explore(item.Path);
         }
 
         /// <inheritdoc/>
@@ -82,83 +73,18 @@ namespace FarNet.ACD
         {
             string path = Location;
 
-            return Client.GetFiles(path);
-        }
-
-        /// <summary>
-        /// Progress Form builder
-        /// </summary>
-        /// <param name="activity">Current activity description (form text)</param>
-        /// <param name="title">Form title</param>
-        /// <returns></returns>
-        private Tools.ProgressForm GetProgressForm(string activity, string title)
-        {
-            var form = new Tools.ProgressForm();
-            form.Activity = activity;
-            form.Title = title;
-            form.CanCancel = true;
-            form.Canceled += (object sender, EventArgs e) =>
+            if (args.Mode != ExplorerModes.Find)
             {
-                form.Close();
-                // we cannot throw and exception here, since it is another thread
-                //throw new OperationCanceledException();
-            };
-
-            return form;
-        }
-
-        /// <summary>
-        /// Reset Event that is used to pause threads
-        /// </summary>
-        /// <param name="message"></param>
-        /// <returns></returns>
-        private ManualResetEvent GetResetEvent(string message, string title, Tools.ProgressForm form)
-        {
-            var wh = new ManualResetEvent(true); // start in a signaled way, i.e. resumed state
-            form.Canceling += (object sender, Forms.ClosingEventArgs cancelArgs) =>
-            {
-                wh.Reset(); // pause Upload
-
-                if (Far.Api.Message(message, title, MessageOptions.YesNo | MessageOptions.Warning) != 0)
-                {
-                    cancelArgs.Ignore = true;
-                }
-
-                wh.Set(); // resume Upload
-            };
-
-            return wh;
-        }
-
-        /// <summary>
-        /// TODO
-        /// </summary>
-        /// <param name="file"></param>
-        /// <param name="parentItem"></param>
-        /// <param name="form"></param>
-        private long DoUpload(FarFile file, FSItem parentItem, Tools.ProgressForm form, ManualResetEvent wh, long progress, long maxprogress)
-        {
-            Exception exists = null;
-            var ACDFilePath = Path.Combine(parentItem.Path, Path.GetFileName(file.Name));
-
-            Task<FSItem> item = Client.FetchNode(ACDFilePath);
-            item.Wait();
-            if (item.Result != null)
-            {
-                throw new RemoteFileExistsException("File exists " + ACDFilePath);
+                Panel.ShowRetryDialogInGetFiles = true;
             }
 
-            for (var i = 0; i < MAX_UPLOAD_TRIES; i++)
+            do
             {
-                Task<long> uploadNewTask = Client.UploadNewFile(parentItem, file.Name, form, wh, progress, maxprogress);
-                Azi.Tools.HttpWebException webEx = null;
-
-                form.Activity += ".";
+                Exception failure = null;
 
                 try
                 {
-                    uploadNewTask.Wait();
-                    return uploadNewTask.Result;
+                    return Client.GetFiles(path);
                 }
                 catch (AggregateException ae)
                 {
@@ -166,131 +92,33 @@ namespace FarNet.ACD
                     {
                         if (x is TaskCanceledException)
                         {
-                            return true; // processed
-                        }
-
-                        if (x is Azi.Tools.HttpWebException && (x as Azi.Tools.HttpWebException).StatusCode == System.Net.HttpStatusCode.Conflict)
-                        {
-                            exists = x;
-                            return true; // processed
-                        }
-
-                        if (x is Azi.Tools.HttpWebException && (x as Azi.Tools.HttpWebException).StatusCode == System.Net.HttpStatusCode.InternalServerError)
-                        {
-                            webEx = (Azi.Tools.HttpWebException)x;
                             return true;
                         }
 
-                        if (x is Azi.Tools.HttpWebException && (x as Azi.Tools.HttpWebException).StatusCode == System.Net.HttpStatusCode.ServiceUnavailable)
-                        {
-                            webEx = (Azi.Tools.HttpWebException)x;
-                            return true;
-                        }
+                        failure = x;
 
-                        if (x is Azi.Tools.HttpWebException && (x as Azi.Tools.HttpWebException).StatusCode == System.Net.HttpStatusCode.GatewayTimeout)
-                        {
-                            webEx = (Azi.Tools.HttpWebException)x;
-                            return true;
-                        }
-
-                        // TODO: handle remaining types
-                        //exception = x;
-
-                        return false; // unprocessed
+                        return true;
                     });
-                }
 
-                if (webEx == null)
-                {
+                    if (Panel.ShowRetryDialogInGetFiles)
+                    {
+                        var dlg = new AutoRetryDialog("Exception during execution: " + UserFriendlyException(failure), "Get files error");
+                        var res = dlg.Display();
+                        if (res == 0)
+                        {
+                            continue;
+                        }
+                        if (args.Mode == ExplorerModes.Find && res == 1)
+                        {
+                            Panel.ShowRetryDialogInGetFiles = false;
+                        }
+                    }
+
                     break;
                 }
-            }
+            } while (true);
 
-            if (exists != null)
-            {
-                throw new RemoteFileExistsException("File exists " + ACDFilePath, exists);
-            }
-
-            return progress;
-        }
-
-        /// <summary>
-        /// TODO
-        /// </summary>
-        /// <param name="file"></param>
-        /// <param name="parentItem"></param>
-        /// <param name="form"></param>
-        private long DoReplace(FarFile file, FSItem parentItem, Tools.ProgressForm form, ManualResetEvent wh, long progress, long maxprogress)
-        {
-            Task<long> replaceTask = Client.ReplaceFile(parentItem, file.Name, form, wh, progress, maxprogress);
-
-            try
-            {
-                replaceTask.Wait();
-                return replaceTask.Result;
-            }
-            catch (AggregateException ae)
-            {
-                ae.Handle((x) =>
-                {
-                    if (x is TaskCanceledException)
-                    {
-                        form.Complete();
-                        return true; // processed
-                    }
-
-                    //if (x is Azi.Tools.HttpWebException)
-                    //{
-                    //    exists = true;
-                    //    return true; // processed
-                    //}
-
-                    // TODO: handle remaining types
-                    //exception = x;
-
-                    return false; // unprocessed
-                });
-            }
-
-            return progress;
-        }
-
-        /// <summary>
-        /// TODO
-        /// </summary>
-        /// <param name="Files"></param>
-        /// <returns></returns>
-        private List<FarFile> GetFarFilesRecursive(IList<FarFile> Files)
-        {
-            List<FarFile> files = new List<FarFile>();
-
-            foreach (var file in Files)
-            {
-                var path = Path.Combine(Far.Api.Panel.CurrentDirectory, file.Name);
-                if (file.IsDirectory)
-                {
-                    foreach (string dfile in Utility.GetFiles(path))
-                    {
-                        SetFile farfile;
-                        if (Directory.Exists(dfile))
-                        {
-                            farfile = new SetFile(new DirectoryInfo(dfile), true);
-                        }
-                        else
-                        {
-                            farfile = new SetFile(new FileInfo(dfile), true);
-                        }
-                        files.Add(farfile);
-                    }
-                }
-                else
-                {
-                    file.Name = path;
-                    files.Add(file);
-                }
-            }
-
-            return files;
+            return new List<FarFile>();
         }
 
         /// <inheritdoc/>
@@ -356,7 +184,7 @@ namespace FarNet.ACD
                 foreach (var file in files)
                 {
                     // Get file name to use with ACD
-                    acdFileName = Far.Api.Panel2.CurrentDirectory.TrimEnd('\\') + file.Name.Replace(Far.Api.Panel.CurrentDirectory, "");
+                    acdFileName = Far.Api.Panel2.CurrentDirectory.TrimEnd('\\') + file.Name.Replace(Panel.CurrentDirectory, "");
                     var parentAcdFileName = Path.GetDirectoryName(acdFileName);
 
                     // If a file is a directory, then we should try to create it.
@@ -508,18 +336,6 @@ namespace FarNet.ACD
             if (args == null) return;
             if (args != null) args.Result = JobResult.Ignore;
 
-            if (Far.Api.Panel2.IsPlugin)
-            {
-                // How to copy files to plugins??
-                return;
-            }
-
-            if (Far.Api.Panel2.CurrentDirectory == null)
-            {
-                // how can it be?
-                return;
-            }
-
             args.Result = JobResult.Incomplete;
             var form = GetProgressForm("Downloading...", "Amazon Cloud Drive - File Download Progress");
             var wh = GetResetEvent("Do you wish to interrupt download?", "Download", form);
@@ -529,7 +345,8 @@ namespace FarNet.ACD
                 foreach (var file in args.Files)
                 {
                     //var item = ((file.Data as Hashtable)["fsitem"] as FSItem);
-                    var item = CacheStorage.GetItem(file.Description); // description === Id
+                    //var item = CacheStorage.GetItemById(file.Description); // description === Id
+                    var item = Client.FetchNode(Path.Combine(Panel.CurrentDirectory, file.Name)).Result;
                     var path = Path.Combine(Far.Api.Panel2.CurrentDirectory, item.Name);
 
                     form.SetProgressValue(0, item.Length);
@@ -553,18 +370,11 @@ namespace FarNet.ACD
                         });
                         break;
                     }
-                    /*
-                    catch
-                    {
-                        // what to do in case of any other exception?
-                    }
-                    */
                 }
                 form.Complete();
             });
 
             jobThread.Start();
-            // wait a little bit
             Thread.Sleep(500);
             form.Show();
 
@@ -595,7 +405,7 @@ namespace FarNet.ACD
                 return;
             }
 
-            var path = Path.Combine(Far.Api.Panel.CurrentDirectory, dlg.Text);
+            var path = Path.Combine(Panel.CurrentDirectory, dlg.Text);
             Task<FSItem> mdTask = Client.CreateDirectory(path);
 
             var form = GetProgressForm("Creating the directory...", "Amazon Cloud Drive - Create Directory");
@@ -650,55 +460,81 @@ namespace FarNet.ACD
 
             args.Result = JobResult.Incomplete;
             args.CanSet = true;
-            var form = GetProgressForm("Downloading...", "Amazon Cloud Drive - File Download Progress");
-            var wh = GetResetEvent("Do you wish to interrupt download?", "Download", form);
 
-            var jobThread = new Thread(() =>
+            Tools.ProgressForm form = null;
+            int res = -1000;
+
+            do
             {
-                var file = args.File;
-                //var item = ((file.Data as Hashtable)["fsitem"] as FSItem);
-                var item = CacheStorage.GetItem(file.Description); // description === Id
-                var path = args.FileName;
+                form = GetProgressForm("Downloading...", "Amazon Cloud Drive - File Download Progress");
+                var wh = GetResetEvent("Do you wish to interrupt download?", "Download", form);
 
-                form.SetProgressValue(0, item.Length);
+                Exception failure = null;
 
-                Task downloadTask = Client.DownloadFile(item, path, form, wh);
-
-                try
+                var jobThread = new Thread(() =>
                 {
-                    downloadTask.Wait();
-                }
-                catch (AggregateException ae)
-                {
-                    ae.Handle((x) =>
+                    var file = args.File;
+                    //var item = ((file.Data as Hashtable)["fsitem"] as FSItem);
+                    //var item = CacheStorage.GetItemById(file.Description); // description === Id
+                    var item = Client.FetchNode(Path.Combine(Panel.CurrentDirectory, args.File.Name)).Result;
+                    var path = args.FileName;
+
+                    form.SetProgressValue(0, item.Length);
+
+                    Task downloadTask = Client.DownloadFile(item, path, form, wh);
+
+                    try
                     {
-                        if (x is TaskCanceledException)
+                        downloadTask.Wait();
+                    }
+                    catch (AggregateException ae)
+                    {
+                        ae.Handle((x) =>
                         {
+                            if (x is TaskCanceledException)
+                            {
+                                form.Complete();
+                                return true; // processed
+                            }
+   
+                            failure = x;
                             form.Complete();
-                            return true; // processed
-                        }
-                        return false; // unprocessed
-                    });
-                    form.Close();
-                    return;
-                }
-                /*
-                catch
-                {
-                    // what to do in case of any other exception?
-                }
-                */
-                form.Complete();
-            });
 
-            jobThread.Start();
-            // wait a little bit
-            Thread.Sleep(500);
-            form.Show();
+                            return true; // we catch any aggregated exception and let the user retry the operation
+                        });
+                        form.Close();
+                        return;
+                    }
+                    form.Complete();
+                });
+
+                jobThread.Start();
+                Thread.Sleep(500);
+                form.Show();
+
+                if (failure != null)
+                {
+                    var dlg = new AutoRetryDialog("Error during execution: " + UserFriendlyException(failure), "Download error");
+                    res = dlg.Display();
+                    if (res == 0)
+                    {
+                        continue;
+                    }
+                }
+
+                break;
+            } while (true);
 
             if (form.IsCompleted)
             {
-                args.Result = JobResult.Done;
+                if (res == 0 || res == -1)
+                {
+                    args.Result = JobResult.Ignore;
+                }
+                else
+                {
+                    args.Result = JobResult.Done;
+                }
             }
             else
             {
@@ -744,7 +580,8 @@ namespace FarNet.ACD
             {
                 foreach (var file in args.Files)
                 {
-                    var item = ((file.Data as Hashtable)["fsitem"] as FSItem);
+                    //var item = ((file.Data as Hashtable)["fsitem"] as FSItem);
+                    var item = Client.FetchNode(file.Name).Result;
                     var path = Path.Combine(Far.Api.Panel2.CurrentDirectory, item.Name);
 
                     Task downloadTask = Client.DeleteFile(item, form);
@@ -765,12 +602,6 @@ namespace FarNet.ACD
                         });
                         break;
                     }
-                    /*
-                    catch
-                    {
-                        // what to do in case of any other exception?
-                    }
-                    */
                 }
                 form.Complete();
             });
@@ -790,7 +621,8 @@ namespace FarNet.ACD
             if (args == null) return;
             if (args != null) args.Result = JobResult.Ignore;
 
-            var item = ((args.File.Data as Hashtable)["fsitem"] as FSItem);
+            //var item = ((args.File.Data as Hashtable)["fsitem"] as FSItem);
+            var item = Client.FetchNode(Path.Combine(Panel.CurrentDirectory, args.File.Name)).Result;
             IInputBox input = Far.Api.CreateInputBox();
             input.EmptyEnabled = true;
             input.Title = "Rename";
@@ -828,5 +660,223 @@ namespace FarNet.ACD
 			Panel = new ACDPanel(this);
             return Panel;
 		}
-	}
+
+
+        /// <summary>
+        /// Progress Form builder
+        /// </summary>
+        /// <param name="activity">Current activity description (form text)</param>
+        /// <param name="title">Form title</param>
+        /// <returns></returns>
+        private Tools.ProgressForm GetProgressForm(string activity, string title)
+        {
+            var form = new Tools.ProgressForm();
+            form.Activity = activity;
+            form.Title = title;
+            form.CanCancel = true;
+            form.Canceled += (object sender, EventArgs e) =>
+            {
+                form.Close();
+                // we cannot throw and exception here, since it is another thread
+                //throw new OperationCanceledException();
+            };
+
+            return form;
+        }
+
+        /// <summary>
+        /// Reset Event that is used to pause threads
+        /// </summary>
+        /// <param name="message"></param>
+        /// <returns></returns>
+        private ManualResetEvent GetResetEvent(string message, string title, Tools.ProgressForm form)
+        {
+            var wh = new ManualResetEvent(true); // start in a signaled way, i.e. resumed state
+            form.Canceling += (object sender, Forms.ClosingEventArgs cancelArgs) =>
+            {
+                wh.Reset(); // pause Upload
+
+                if (Far.Api.Message(message, title, MessageOptions.YesNo | MessageOptions.Warning) != 0)
+                {
+                    cancelArgs.Ignore = true;
+                }
+
+                wh.Set(); // resume Upload
+            };
+
+            return wh;
+        }
+
+        /// <summary>
+        /// TODO
+        /// </summary>
+        /// <param name="file"></param>
+        /// <param name="parentItem"></param>
+        /// <param name="form"></param>
+        private long DoUpload(FarFile file, FSItem parentItem, Tools.ProgressForm form, ManualResetEvent wh, long progress, long maxprogress)
+        {
+            Exception exists = null;
+            var ACDFilePath = Path.Combine(parentItem.Path, Path.GetFileName(file.Name));
+
+            Task<FSItem> item = Client.FetchNode(ACDFilePath);
+            item.Wait();
+            if (item.Result != null)
+            {
+                throw new RemoteFileExistsException("File exists " + ACDFilePath);
+            }
+
+            for (var i = 0; i < MAX_UPLOAD_TRIES; i++)
+            {
+                Task<long> uploadNewTask = Client.UploadNewFile(parentItem, file.Name, form, wh, progress, maxprogress);
+                Azi.Tools.HttpWebException webEx = null;
+
+                form.Activity += ".";
+
+                try
+                {
+                    uploadNewTask.Wait();
+                    return uploadNewTask.Result;
+                }
+                catch (AggregateException ae)
+                {
+                    ae.Handle((x) =>
+                    {
+                        if (x is TaskCanceledException)
+                        {
+                            return true; // processed
+                        }
+
+                        if (x is Azi.Tools.HttpWebException && (x as Azi.Tools.HttpWebException).StatusCode == System.Net.HttpStatusCode.Conflict)
+                        {
+                            exists = x;
+                            return true; // processed
+                        }
+
+                        if (x is Azi.Tools.HttpWebException && (x as Azi.Tools.HttpWebException).StatusCode == System.Net.HttpStatusCode.InternalServerError)
+                        {
+                            webEx = (Azi.Tools.HttpWebException)x;
+                            return true;
+                        }
+
+                        if (x is Azi.Tools.HttpWebException && (x as Azi.Tools.HttpWebException).StatusCode == System.Net.HttpStatusCode.ServiceUnavailable)
+                        {
+                            webEx = (Azi.Tools.HttpWebException)x;
+                            return true;
+                        }
+
+                        if (x is Azi.Tools.HttpWebException && (x as Azi.Tools.HttpWebException).StatusCode == System.Net.HttpStatusCode.GatewayTimeout)
+                        {
+                            webEx = (Azi.Tools.HttpWebException)x;
+                            return true;
+                        }
+
+                        return false; // unprocessed
+                    });
+                }
+
+                if (webEx == null)
+                {
+                    break;
+                }
+            }
+
+            if (exists != null)
+            {
+                throw new RemoteFileExistsException("File exists " + ACDFilePath, exists);
+            }
+
+            return progress;
+        }
+
+        /// <summary>
+        /// TODO
+        /// </summary>
+        /// <param name="file"></param>
+        /// <param name="parentItem"></param>
+        /// <param name="form"></param>
+        private long DoReplace(FarFile file, FSItem parentItem, Tools.ProgressForm form, ManualResetEvent wh, long progress, long maxprogress)
+        {
+            Task<long> replaceTask = Client.ReplaceFile(parentItem, file.Name, form, wh, progress, maxprogress);
+
+            try
+            {
+                replaceTask.Wait();
+                return replaceTask.Result;
+            }
+            catch (AggregateException ae)
+            {
+                ae.Handle((x) =>
+                {
+                    if (x is TaskCanceledException)
+                    {
+                        form.Complete();
+                        return true; // processed
+                    }
+
+                    return false; // unprocessed
+                });
+            }
+
+            return progress;
+        }
+
+        /// <summary>
+        /// TODO
+        /// </summary>
+        /// <param name="Files"></param>
+        /// <returns></returns>
+        private List<FarFile> GetFarFilesRecursive(IList<FarFile> Files)
+        {
+            List<FarFile> files = new List<FarFile>();
+
+            foreach (var file in Files)
+            {
+                var path = Path.Combine(Panel.CurrentDirectory, file.Name);
+                if (file.IsDirectory)
+                {
+                    foreach (string dfile in Utility.GetFiles(path))
+                    {
+                        SetFile farfile;
+                        if (Directory.Exists(dfile))
+                        {
+                            farfile = new SetFile(new DirectoryInfo(dfile), true);
+                        }
+                        else
+                        {
+                            farfile = new SetFile(new FileInfo(dfile), true);
+                        }
+                        files.Add(farfile);
+                    }
+                }
+                else
+                {
+                    file.Name = path;
+                    files.Add(file);
+                }
+            }
+
+            return files;
+        }
+
+        private string UserFriendlyException(Exception ex)
+        {
+            string errorMsg = "";
+            if (ex is Azi.Tools.HttpWebException)
+            {
+                errorMsg = string.Format(
+                    "{0}: {1}", (ex as Azi.Tools.HttpWebException).StatusCode, (ex as Azi.Tools.HttpWebException).Message);
+            }
+            else if (ex is System.IO.IOException)
+            {
+                errorMsg = ex.Message;
+            }
+            else
+            {
+                // unknown exceptions will be tracked in full
+                errorMsg = ex.ToString();
+            }
+
+            return errorMsg;
+        }
+    }
 }
