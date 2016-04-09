@@ -313,6 +313,15 @@ namespace FarNet.ACD
                         }
 
                         break;
+
+                    case KeyCode.R:
+
+                        if (key.IsCtrl())
+                        {
+                            CacheStorage.RemoveItems(Far.Api.Panel.CurrentDirectory);
+                        }
+
+                        break;
                 }
 
                 // base

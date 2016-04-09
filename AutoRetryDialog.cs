@@ -88,17 +88,29 @@ namespace FarNet.ACD
             }
 
             var timer = new System.Timers.Timer(1000);
+            bool AutoClose = false;
 
             Dialog.Default = buttons[_DefaultButton];
             Dialog.Default.Text = _Buttons[_DefaultButton].Replace("(00)", string.Format("({0:00})", 10));
             Dialog.SetFocus(buttons[_DefaultButton].Id);
             Dialog.Closing += (object sender, ClosingEventArgs e) =>
             {
-                timer.Enabled = true;
-                if (e.Control != null)
+                timer.Enabled = false;
+                _clickedButton = (int)Dialog.Focused.Data;
+            };
+
+            Dialog.Idled += (object sender, EventArgs e) =>
+            {
+                if (AutoClose)
                 {
-                    _clickedButton = (int)e.Control.Data;
+                    Dialog.SetFocus(buttons[_DefaultButton].Id);
+                    Dialog.Close();
                 }
+            };
+
+            Dialog.KeyPressed += (object sender, KeyPressedEventArgs e) =>
+            {
+                timer.Enabled = false;
             };
 
             var i = 9;
@@ -106,9 +118,8 @@ namespace FarNet.ACD
             {
                 if (i < 0)
                 {
+                    AutoClose = true;
                     timer.Enabled = false;
-                    Dialog.SetFocus(buttons[_DefaultButton].Id);
-                    Dialog.Close();
                     return;
                 }
                 Dialog.Default.Text = _Buttons[_DefaultButton].Replace("(00)", string.Format("({0:00})", i--));

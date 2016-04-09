@@ -336,7 +336,7 @@ namespace FarNet.ACD
         /// <param name="src"></param>
         /// <param name="form"></param>
         /// <returns></returns>
-        public async Task<long> ReplaceFile(FSItem parentItem, string src, Tools.ProgressForm form, EventWaitHandle wh, long progress, long maxprogress)
+        public async Task<long> ReplaceFile(FSItem parentItem, string src, Tools.ProgressForm form, EventWaitHandle wh, long progress, long maxprogress, string ACDFilePath = null)
         {
             var itemLength = new FileInfo(src).Length;
             var totalBytes = Utility.BytesToString(itemLength);
@@ -348,7 +348,10 @@ namespace FarNet.ACD
             fileUpload.AllowDuplicate = true;
             fileUpload.ParentId = parentItem.Id;
             // for upload we need a node id to replace
-            var ACDFilePath = Path.Combine(parentItem.Path, filename);
+            if (ACDFilePath == null)
+            {
+                ACDFilePath = Path.Combine(parentItem.Path, filename);
+            }
             var node = await FetchNode(ACDFilePath);
             if (node == null)
             {

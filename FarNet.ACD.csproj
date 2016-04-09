@@ -70,6 +70,8 @@
     <Compile Include="CacheStorage.cs" />
     <Compile Include="Exceptions\RemoteFileExistsException.cs" />
     <Compile Include="Exceptions\IOException.cs" />
+    <Compile Include="Exceptions\TaskAbortedException.cs" />
+    <Compile Include="Exceptions\TaskIgnoredException.cs" />
     <Compile Include="FSItem.cs" />
     <Compile Include="ACDSettings.cs" />
     <Compile Include="InputDialog.cs" />
