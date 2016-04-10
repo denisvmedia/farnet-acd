@@ -23,10 +23,15 @@ namespace FarNet.ACD
         /// </summary>
         private AmazonDrive amazon;
 
+        private bool _authenticated = false;
+
         /// <summary>
         /// TODO
         /// </summary>
-        private bool IsAuthenticated = false;
+        public bool Authenticated {
+            get { return _authenticated; }
+            set { _authenticated = value; }
+        }
 
         /// <summary>
         /// TODO
@@ -54,6 +59,7 @@ namespace FarNet.ACD
                     Settings.AuthRenewToken,
                     Settings.AuthTokenExpiration))
                 {
+                    Authenticated = true;
                     return amazon;
                 }
             }
@@ -61,10 +67,10 @@ namespace FarNet.ACD
 
             if (await amazon.AuthenticationByExternalBrowser(CloudDriveScopes.ReadAll | CloudDriveScopes.Write, TimeSpan.FromMinutes(2), cs, "http://localhost:{0}/signin/"))
             {
+                Authenticated = true;
                 return amazon;
             }
 
-            //cs.ThrowIfCancellationRequested();
             return null;
         }
 
@@ -150,7 +156,7 @@ namespace FarNet.ACD
                 return items;
             }
 
-            var folderNode = FetchNode(folderPath).Result;
+            var folderNode = await FetchNode(folderPath);
 
             var nodes = await amazon.Nodes.GetChildren(folderNode?.Id);
             items = new List<FSItem>(nodes.Count);
@@ -183,23 +189,38 @@ namespace FarNet.ACD
         /// <param name="dest"></param>
         /// <param name="form"></param>
         /// <returns></returns>
-        public async Task DownloadFile(FSItem item, string dest, Tools.ProgressForm form, EventWaitHandle wh)
+        public async Task<long> DownloadFile(FSItem item, string dest, Tools.ProgressForm form, EventWaitHandle wh, long progress, long totalsize)
         {
-            using (var fs = new FileStream(dest, FileMode.OpenOrCreate))
+            if (item.IsDir)
+            {
+                form.Activity = string.Format("{0} {1})", "Creating directory", Utility.ShortenString(dest, 20));
+                Directory.CreateDirectory(dest);
+                return progress;
+            }
+
+            using (var fs = new FileStream(dest, FileMode.Create))
             {
                 var totalBytes = Utility.BytesToString(item.Length);
                 await amazon.Files.Download(item.Id, fs, null, null, 4096, (long position) =>
                 {
                     wh.WaitOne();
+
                     if (form.IsClosed)
                     {
-                        throw new OperationCanceledException();
+                        fs.Dispose();
+                        throw new TaskCanceledException();
                     }
-                    //Log.Source.TraceInformation("Progress: {0}", progress);
-                    form.Activity = string.Format("{0} ({1}/{2})", Utility.ShortenString(item.Path, 20), Utility.BytesToString(position), totalBytes);
-                    form.SetProgressValue(position, item.Length);
+
+                    form.Activity = string.Format("{0} ({1}/{2})", Utility.ShortenString(dest, 20), Utility.BytesToString(position), totalBytes) + Environment.NewLine;
+                    form.Activity += Progress.FormatProgress(position, item.Length) + Environment.NewLine;
+                    form.Activity += "Total:";
+
+                    form.SetProgressValue(progress + position, totalsize);
+
                     return position;
                 });
+
+                return progress + item.Length;
             }
         }
 
@@ -239,7 +260,7 @@ namespace FarNet.ACD
 
             if (parent == null)
             {
-                parent = FetchNode(dir).Result;
+                parent = await FetchNode(dir);
                 if (parent == null)
                 {
                     return null;
@@ -292,7 +313,7 @@ namespace FarNet.ACD
         /// <param name="src"></param>
         /// <param name="form"></param>
         /// <returns></returns>
-        public async Task<long> UploadNewFile(FSItem parentItem, string src, Tools.ProgressForm form, EventWaitHandle wh, long progress, long maxprogress)
+        public async Task<long> UploadNewFile(FSItem parentItem, string src, Tools.ProgressForm form, EventWaitHandle wh, long progress, long totalsize)
         {
             var itemLength = new FileInfo(src).Length;
             var totalBytes = Utility.BytesToString(itemLength);
@@ -305,12 +326,12 @@ namespace FarNet.ACD
             fileUpload.Progress = (long position) =>
             {
                 wh.WaitOne();
-                //Log.Source.TraceInformation("Progress: {0}", progress);
+
                 form.Activity = string.Format("{0} ({1}/{2})", Utility.ShortenString(src, 20), Utility.BytesToString(position), totalBytes) + Environment.NewLine;
                 form.Activity += Progress.FormatProgress(position, itemLength) + Environment.NewLine;
                 form.Activity += "Total:";
 
-                form.SetProgressValue(progress + position, maxprogress);
+                form.SetProgressValue(progress + position, totalsize);
 
                 return position;
             };
@@ -397,7 +418,7 @@ namespace FarNet.ACD
                 return false;
             }
 
-            var newParentNode = FetchNode(newParent).Result;
+            var newParentNode = await FetchNode(newParent);
 
             return await MoveFile(item, newParentNode);
         }
@@ -442,7 +463,7 @@ namespace FarNet.ACD
             }
 
             // 1. Is newName a folder?
-            var newParentNode = FetchNode(newName).Result;
+            var newParentNode = await FetchNode(newName);
             if (newParentNode != null)
             {
                 return await MoveFile(item, newParentNode);
@@ -459,7 +480,7 @@ namespace FarNet.ACD
             }
 
             // 2.1.1 If destination (destination) node does not exist or is not a directory, we should fail
-            var destinationNode = FetchNode(destination).Result;
+            var destinationNode = await FetchNode(destination);
             if (destinationNode == null || !destinationNode.IsDir)
             {
                 return false; // TODO: throw exception
@@ -515,85 +536,6 @@ namespace FarNet.ACD
             settings.AuthRenewToken = refresh_token;
             settings.AuthTokenExpiration = expires_in;
             settings.Save();
-        }
-
-        /// <summary>
-        /// TODO
-        /// </summary>
-        /// <returns></returns>
-        public bool UIAuthenticate()
-        {
-            var cs = new CancellationTokenSource();
-            var token = cs.Token;
-
-            var form = new Tools.ProgressForm();
-            form.Canceled += delegate
-            {
-                cs.Cancel(false);
-            };
-            form.Title = "Amazon Cloud Drive: Authentication";
-            form.Activity = "Authenticating...";
-            form.CanCancel = true;
-
-            Task<AmazonDrive> task = Authenticate(token, true);
-
-            var _task = Task.Factory.StartNew(() =>
-            {
-                form.Show();
-            });
-
-            try
-            {
-                task.Wait(token);
-            }
-            catch (AggregateException) // some exception in event (most likely timeout)
-            {
-                form.Complete();
-            }
-            catch (OperationCanceledException) // cancellation was requested from the dialog
-            {
-            }
-
-            if (!token.IsCancellationRequested && task.Status == TaskStatus.RanToCompletion)
-            {
-                form.Complete();
-                return IsAuthenticated = true;
-            }
-
-            return IsAuthenticated = false;
-        }
-
-        /// <summary>
-        /// TODO
-        /// </summary>
-        /// <param name="Path"></param>
-        /// <returns></returns>
-        public IList<FarFile> GetFiles(string Path = "\\")
-        {
-            Log.Source.TraceInformation("ACDClient::GetFiles, Path = {0}", Path);
-            IList<FarFile> Files = new List<FarFile>();
-
-            if (!IsAuthenticated && !UIAuthenticate())
-            {
-                throw new TaskCanceledException();
-            }
-
-            var itemsData = GetDirItems(Path);
-            itemsData.Wait();
-            var items = itemsData.Result;
-
-            if (items == null)
-            {
-                return Files;
-            }
-
-            foreach (var item in items)
-            {
-                var file = GetFarFileFromFSItem(item);
-                Files.Add(file);
-            }
-
-            return Files;
         }
 
         /// <summary>

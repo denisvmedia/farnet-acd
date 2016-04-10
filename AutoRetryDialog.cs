@@ -122,6 +122,8 @@ namespace FarNet.ACD
                     timer.Enabled = false;
                     return;
                 }
+
+                // potentially dangerous, but seems working fine
                 Dialog.Default.Text = _Buttons[_DefaultButton].Replace("(00)", string.Format("({0:00})", i--));
             };
             timer.Enabled = true;

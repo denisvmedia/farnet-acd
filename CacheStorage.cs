@@ -31,7 +31,6 @@ namespace FarNet.ACD
         {
 #pragma warning disable 0162
             //return null;
-#pragma warning restore 0162
             if (!itemsByPath.ContainsKey(Path))
             {
                 return null;
@@ -44,6 +43,7 @@ namespace FarNet.ACD
             }
 
             return itemsByPath[Path];
+#pragma warning restore 0162
         }
 
         public static IList<FSItem> GetItemsByParentPath(string ParentPath)
