@@ -23,7 +23,7 @@ namespace FarNet.ACD
         /// <summary>
         /// Hack: let user hiding the dialog for the whole iteration
         /// </summary>
-        public bool ShowRetryDialogInGetFiles = true;
+        public int RetryDialogResultInGetFiles = -1000;
 
         /// <summary>
         /// The last user action.

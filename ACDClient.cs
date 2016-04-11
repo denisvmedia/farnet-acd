@@ -79,10 +79,13 @@ namespace FarNet.ACD
         /// </summary>
         /// <param name="itemPath"></param>
         /// <returns></returns>
-        public async Task<FSItem> FetchNode(string itemPath)
+        public async Task<FSItem> FetchNode(string itemPath, bool CacheBypass = false)
         {
             FSItem item = null;
-            item = CacheStorage.GetItemByPath(itemPath);
+            if (!CacheBypass)
+            {
+                item = CacheStorage.GetItemByPath(itemPath);
+            }
 
             if (item != null)
             {
@@ -120,7 +123,11 @@ namespace FarNet.ACD
 
                 curpath = curpath + "\\" + name;
 
-                var nextitem = CacheStorage.GetItemByPath(curpath);
+                FSItem nextitem = null;
+                if (!CacheBypass)
+                {
+                    nextitem = CacheStorage.GetItemByPath(curpath);
+                }
 
                 if (nextitem == null)
                 {
@@ -208,6 +215,11 @@ namespace FarNet.ACD
                     if (form.IsClosed)
                     {
                         fs.Dispose();
+                        try
+                        {
+                            File.Delete(dest);
+                        }
+                        catch { }
                         throw new TaskCanceledException();
                     }
 

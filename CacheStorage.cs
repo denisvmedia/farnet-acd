@@ -56,7 +56,8 @@ namespace FarNet.ACD
                 return null;
             }
 
-            if (itemsByParentPath[ParentPath][0].IsExpired(60 * 15)) // if the first one is expired, then consider all as expired
+            // if the first one is expired, then consider all as expired
+            if (itemsByParentPath[ParentPath].Count > 0 && itemsByParentPath[ParentPath][0].IsExpired(60 * 15))
             {
                 itemsByParentPath.Remove(ParentPath); // expired
                 return null;

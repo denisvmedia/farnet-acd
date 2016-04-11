@@ -3,13 +3,14 @@ Experimental Amazon Cloud Drive FarNet module
 
 ## TODO
 * F6 support from and to the module panel
-* (partially done) Handling situations when the remote server is not working properly (sometimes it can return 503)
-* Partial file upload indication
-* Ask to delete or keep partially downloaded file
-* Overwrite confirmation dialog during download
-* (partially done) Proper Exception handling (at least prevent Far crashes)
+* Panel: Partial file upload indication
+* Export Files: Ask for the path where to copy the files
 
 ## Possible further extension
+* Share/Unshare files via menu
+* Show extended file information via menu
+* Ask to delete or keep partially downloaded file
+* (for directories) Merge confirmation dialog during download
 * Trash display
 * Support for untrashing files
 * Folder Tree display
