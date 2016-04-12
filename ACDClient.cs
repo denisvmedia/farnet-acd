@@ -207,7 +207,6 @@ namespace FarNet.ACD
 
             using (var fs = new FileStream(dest, FileMode.Create))
             {
-                var totalBytes = Utility.BytesToString(item.Length);
                 await amazon.Files.Download(item.Id, fs, null, null, 4096, (long position) =>
                 {
                     wh.WaitOne();
@@ -223,9 +222,7 @@ namespace FarNet.ACD
                         throw new TaskCanceledException();
                     }
 
-                    form.Activity = string.Format("{0} ({1}/{2})", Utility.ShortenString(dest, 20), Utility.BytesToString(position), totalBytes) + Environment.NewLine;
-                    form.Activity += Progress.FormatProgress(position, item.Length) + Environment.NewLine;
-                    form.Activity += "Total:";
+                    form.Activity = Progress.GetActivityProgress(dest, position, item.Length, progress + position, totalsize);
 
                     form.SetProgressValue(progress + position, totalsize);
 
@@ -325,41 +322,45 @@ namespace FarNet.ACD
         /// <param name="src"></param>
         /// <param name="form"></param>
         /// <returns></returns>
-        public async Task<long> UploadNewFile(FSItem parentItem, string src, Tools.ProgressForm form, EventWaitHandle wh, long progress, long totalsize)
+        public async Task<long> UploadNewFile(UploadFileData FileData)
         {
-            var itemLength = new FileInfo(src).Length;
+            var itemLength = new FileInfo(FileData.File.Name).Length;
             var totalBytes = Utility.BytesToString(itemLength);
-            var filename = Path.GetFileName(src);
+            var filename = Path.GetFileName(FileData.File.Name);
             var fileUpload = new FileUpload();
             fileUpload.AllowDuplicate = true;
-            fileUpload.ParentId = parentItem.Id;
+            fileUpload.ParentId = FileData.ParentItem.Id;
             fileUpload.FileName = filename;
-            fileUpload.StreamOpener = () => new FileStream(src, FileMode.Open, FileAccess.Read, FileShare.ReadWrite, 4096, true);
+            fileUpload.StreamOpener = () => new FileStream(FileData.File.Name, FileMode.Open, FileAccess.Read, FileShare.ReadWrite, 4096, true);
             fileUpload.Progress = (long position) =>
             {
-                wh.WaitOne();
-
-                form.Activity = string.Format("{0} ({1}/{2})", Utility.ShortenString(src, 20), Utility.BytesToString(position), totalBytes) + Environment.NewLine;
-                form.Activity += Progress.FormatProgress(position, itemLength) + Environment.NewLine;
-                form.Activity += "Total:";
-
-                form.SetProgressValue(progress + position, totalsize);
+                FileData.PauseEvent.WaitOne();
+                FileData.Form.Activity = Progress.GetActivityProgress(
+                    FileData.File.Name,
+                    position,
+                    itemLength,
+                    FileData.TotalProgress + position,
+                    FileData.TotalSize,
+                    FileData.TimestampStartOne,
+                    FileData.TimestampStartTotal
+                    );
+                FileData.Form.SetProgressValue(FileData.TotalProgress + position, FileData.TotalSize);
 
                 return position;
             };
             var cs = new CancellationTokenSource();
             var token = cs.Token;
             fileUpload.CancellationToken = token;
-            form.Canceled += (object sender, EventArgs e) =>
+            FileData.Form.Canceled += (object sender, EventArgs e) =>
             {
                 cs.Cancel(true);
             };
 
             var node = await amazon.Files.UploadNew(fileUpload);
 
-            CacheStorage.AddItem(FSItem.FromNode(Path.Combine(parentItem.Path, filename), node));
+            CacheStorage.AddItem(FSItem.FromNode(Path.Combine(FileData.ParentItem.Path, filename), node));
 
-            return progress + node.Length;
+            return FileData.TotalProgress + node.Length;
         }
 
         /// <summary>
@@ -369,21 +370,22 @@ namespace FarNet.ACD
         /// <param name="src"></param>
         /// <param name="form"></param>
         /// <returns></returns>
-        public async Task<long> ReplaceFile(FSItem parentItem, string src, Tools.ProgressForm form, EventWaitHandle wh, long progress, long maxprogress, string ACDFilePath = null)
+        public async Task<long> ReplaceFile(UploadFileData FileData)
         {
-            var itemLength = new FileInfo(src).Length;
-            var totalBytes = Utility.BytesToString(itemLength);
-            var filename = Path.GetFileName(src);
+            var itemLength = new FileInfo(FileData.File.Name).Length;
+            var filename = Path.GetFileName(FileData.File.Name);
             var fileUpload = new FileUpload();
             var cs = new CancellationTokenSource();
             var token = cs.Token;
             fileUpload.CancellationToken = token;
             fileUpload.AllowDuplicate = true;
-            fileUpload.ParentId = parentItem.Id;
+            fileUpload.ParentId = FileData.ParentItem.Id;
+
+            var ACDFilePath = FileData.RemoteFileName;
             // for upload we need a node id to replace
-            if (ACDFilePath == null)
+            if (string.IsNullOrEmpty(ACDFilePath))
             {
-                ACDFilePath = Path.Combine(parentItem.Path, filename);
+                ACDFilePath = Path.Combine(FileData.ParentItem.Path, filename);
             }
             var node = await FetchNode(ACDFilePath);
             if (node == null)
@@ -392,20 +394,24 @@ namespace FarNet.ACD
             }
             fileUpload.FileName = node.Id;
 
-            fileUpload.StreamOpener = () => new FileStream(src, FileMode.Open, FileAccess.Read, FileShare.ReadWrite, 4096, true);
+            fileUpload.StreamOpener = () => new FileStream(FileData.File.Name, FileMode.Open, FileAccess.Read, FileShare.ReadWrite, 4096, true);
             fileUpload.Progress = (long position) =>
             {
-                wh.WaitOne();
-                //Log.Source.TraceInformation("Progress: {0}", progress);
-                form.Activity = string.Format("{0} ({1}/{2})", Utility.ShortenString(src, 20), Utility.BytesToString(position), totalBytes) + Environment.NewLine;
-                form.Activity += Progress.FormatProgress(position, itemLength) + Environment.NewLine;
-                form.Activity += "Total:";
-
-                form.SetProgressValue(progress + position, maxprogress);
+                FileData.PauseEvent.WaitOne();
+                FileData.Form.Activity = Progress.GetActivityProgress(
+                    FileData.File.Name,
+                    FileData.TotalProgress,
+                    itemLength,
+                    FileData.TotalProgress + position,
+                    FileData.TotalSize,
+                    FileData.TimestampStartOne,
+                    FileData.TimestampStartTotal
+                    );
+                FileData.Form.SetProgressValue(FileData.TotalProgress + position, FileData.TotalSize);
 
                 return position;
             };
-            form.Canceled += (object sender, EventArgs e) =>
+            FileData.Form.Canceled += (object sender, EventArgs e) =>
             {
                 cs.Cancel(true);
             };
@@ -414,7 +420,7 @@ namespace FarNet.ACD
 
             CacheStorage.AddItem(FSItem.FromNode(ACDFilePath, resultNode));
 
-            return progress + resultNode.Length;
+            return FileData.TotalProgress + resultNode.Length;
         }
         
         /// <summary>

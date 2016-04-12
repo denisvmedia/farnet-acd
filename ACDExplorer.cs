@@ -111,7 +111,24 @@ namespace FarNet.ACD
                         }
                         parent = task.Result;
 
-                        progress = DoReplace(args.FileName, parent, form, wh, progress, maxprogress, acdFileName);
+                        int tsStart = Utility.GetUnixTimestamp();
+
+                        var fileData = new UploadFileData()
+                        {
+                            File = new SetFile() {
+                                Name = args.FileName
+                            },
+                            RemoteFileName = acdFileName,
+                            ParentItem = parent,
+                            Form = form,
+                            PauseEvent = wh,
+                            TotalProgress = progress,
+                            TotalSize = maxprogress,
+                            TimestampStartOne = tsStart,
+                            TimestampStartTotal = tsStart,
+                        };
+
+                        progress = DoReplace(fileData);
                     }
                     catch (Exception ex)
                     {
@@ -233,6 +250,8 @@ namespace FarNet.ACD
 
                 form.SetProgressValue(0, totalsize);
 
+                int tsStart = Utility.GetUnixTimestamp();
+
                 foreach (var file in files)
                 {
                     // Get file name to use with ACD
@@ -312,11 +331,21 @@ namespace FarNet.ACD
                     Upload:
                         try
                         {
+                            int tsStartOne = Utility.GetUnixTimestamp();
                             // trying to upload the file
-                            form.Activity = "Uploading " + Utility.ShortenString(file.Name, 20) + Environment.NewLine;
-                            form.Activity += Progress.FormatProgress(0, file.Length) + Environment.NewLine;
-                            form.Activity += "Total:";
-                            progress = DoUpload(file, parent, form, wh, progress, totalsize);
+                            form.Activity = Progress.GetActivityProgress(file.Name, 0, file.Length, progress, totalsize, tsStartOne, tsStart);
+                            progress = DoUpload(new UploadFileData()
+                            {
+                                File = file,
+                                Form = form,
+                                PauseEvent = wh,
+                                TotalProgress = progress,
+                                ParentItem = parent,
+                                TotalSize = totalsize,
+                                TimestampStartOne = tsStartOne,
+                                TimestampStartTotal = tsStart
+                            });
+
                             form.SetProgressValue(progress, totalsize);
                         }
                         catch (RemoteFileExistsException) // thrown manually
@@ -355,7 +384,7 @@ namespace FarNet.ACD
                         }
 
                         // Did the user decide to cancel upload?
-                        if (form.IsCompleted)
+                        if (form.IsClosed)
                         {
                             break;
                         }
@@ -384,7 +413,24 @@ namespace FarNet.ACD
                         // finally replace the file
                         try
                         {
-                            progress = DoReplace(file.Name, parent, form, wh, progress, totalsize);
+                            int tsStartOne = Utility.GetUnixTimestamp();
+                            form.Activity = Progress.GetActivityProgress(file.Name, 0, file.Length, progress, totalsize, tsStartOne, tsStart);
+                            var fileData = new UploadFileData()
+                            {
+                                File = new SetFile()
+                                {
+                                    Name = file.Name
+                                },
+                                RemoteFileName = acdFileName,
+                                ParentItem = parent,
+                                Form = form,
+                                PauseEvent = wh,
+                                TotalProgress = progress,
+                                TotalSize = totalsize,
+                                TimestampStartOne = tsStartOne,
+                                TimestampStartTotal = tsStart,
+                            };
+                            progress = DoReplace(fileData);
                             form.SetProgressValue(progress, totalsize);
                         }
                         catch (Exception ex)
@@ -1072,10 +1118,10 @@ namespace FarNet.ACD
         /// <param name="file"></param>
         /// <param name="parentItem"></param>
         /// <param name="form"></param>
-        private long DoUpload(FarFile file, FSItem parentItem, Tools.ProgressForm form, ManualResetEvent wh, long progress, long totalsize)
+        private long DoUpload(UploadFileData FileData)
         {
             Exception exists = null;
-            var ACDFilePath = Path.Combine(parentItem.Path, Path.GetFileName(file.Name));
+            var ACDFilePath = Path.Combine(FileData.ParentItem.Path, Path.GetFileName(FileData.File.Name));
 
             Task<FSItem> item = Client.FetchNode(ACDFilePath, true);
             item.Wait();
@@ -1084,7 +1130,7 @@ namespace FarNet.ACD
                 throw new RemoteFileExistsException("File exists " + ACDFilePath);
             }
 
-            Task<long> uploadNewTask = Client.UploadNewFile(parentItem, file.Name, form, wh, progress, totalsize);
+            Task<long> uploadNewTask = Client.UploadNewFile(FileData);
             Exception webEx = null;
 
             try
@@ -1122,7 +1168,7 @@ namespace FarNet.ACD
                 throw new RemoteFileExistsException("File exists " + ACDFilePath, exists);
             }
 
-            return progress;
+            return FileData.TotalProgress;
         }
 
         /// <summary>
@@ -1131,9 +1177,9 @@ namespace FarNet.ACD
         /// <param name="file"></param>
         /// <param name="parentItem"></param>
         /// <param name="form"></param>
-        private long DoReplace(string fileName, FSItem parentItem, Tools.ProgressForm form, ManualResetEvent wh, long progress, long maxprogress, string ACDFilePath = null)
+        private long DoReplace(UploadFileData FileData)
         {
-            Task<long> replaceTask = Client.ReplaceFile(parentItem, fileName, form, wh, progress, maxprogress, ACDFilePath);
+            Task<long> replaceTask = Client.ReplaceFile(FileData);
 
             Exception webEx = null;
 
@@ -1161,7 +1207,7 @@ namespace FarNet.ACD
                 throw webEx;
             }
 
-            return progress;
+            return FileData.TotalProgress;
         }
 
         private long FillFilesAndDirectories(IList<FarFile> Files, Dictionary<string, FarFile> FillFiles, Dictionary<string, FarFile> FillDirs, string DirectoryName)

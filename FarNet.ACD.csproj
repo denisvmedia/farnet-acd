@@ -76,6 +76,7 @@
     <Compile Include="ACDSettings.cs" />
     <Compile Include="InputDialog.cs" />
     <Compile Include="Progress.cs" />
+    <Compile Include="UploadFileData.cs" />
     <Compile Include="Utility.cs" />
   </ItemGroup>
   <ItemGroup>

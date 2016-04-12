@@ -5,6 +5,7 @@ Experimental Amazon Cloud Drive FarNet module
 * F6 support from and to the module panel
 * Panel: Partial file upload indication
 * Export Files: Ask for the path where to copy the files
+* Request Client ID and Client Secret on first panel open
 
 ## Possible further extension
 * Share/Unshare files via menu

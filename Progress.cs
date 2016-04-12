@@ -43,5 +43,42 @@ namespace FarNet.ACD
 
             return new string(SOLID_BLOCK, n) + new string(EMPTY_BLOCK, width - n) + string.Format(null, "{0,3}%", percentage);
         }
+
+        public static long GetSpeed(long progress, long size, int tsStart)
+        {
+            var tsCurrent = Utility.GetUnixTimestamp();
+            var timePassed = tsCurrent - tsStart;
+
+            if (timePassed == 0)
+            {
+                return 0;
+            }
+
+            return ((progress) * 8) / timePassed;
+        }
+
+        /// <summary>
+        /// Gets a string with the current progress of the operation
+        /// </summary>
+        /// <param name="src"></param>
+        /// <param name="position"></param>
+        /// <param name="totalBytes"></param>
+        /// <param name="itemLength"></param>
+        /// <returns></returns>
+        public static string GetActivityProgress(string src, long position, long itemLength, long totalProgress, long totalSize, int tsStartOne = 0, int tsStartAll = 0)
+        {
+            string Activity = "";
+            Activity += string.Format(
+                "{0} ({1}/{2})",
+                Utility.ShortenString(src, 20),
+                Utility.BytesToString(position),
+                Utility.BytesToString(itemLength))
+                + Environment.NewLine;
+            Activity += FormatProgress(position, itemLength) + Environment.NewLine;
+            Activity += string.Format("Total ({0}/{1}, {2}):", Utility.BytesToString(totalProgress), Utility.BytesToString(totalSize), Utility.BPSToString(GetSpeed(totalProgress, totalSize, tsStartAll)));
+
+            return Activity;
+        }
+
     }
 }

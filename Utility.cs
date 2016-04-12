@@ -10,6 +10,8 @@ namespace FarNet.ACD
 {
     public static class Utility
     {
+        internal static DateTime _1900101 = new DateTime(1970, 1, 1);
+
         public static string BytesToString(long byteCount)
         {
             string Result;
@@ -29,6 +31,26 @@ namespace FarNet.ACD
             {
                 // Result = FormatFloat(L"#,##0 \"MiB\"", byteCount / (1024*1024));
                 Result = string.Format("{0} MiB", Math.Round(bytes / (1024 * 1024.0), 0));
+            }
+            return Result;
+        }
+
+        public static string BPSToString(long bps)
+        {
+            string Result;
+            long bpsRate = Math.Abs(bps);
+
+            if (bpsRate < 5 * 1000)
+            {
+                Result = string.Format("{0} bit/s", bpsRate);
+            }
+            else if (bpsRate < 5 * 1000 * 1000)
+            {
+                Result = string.Format("{0} kbit/s", Math.Round(bpsRate / 1000.0, 0));
+            }
+            else
+            {
+                Result = string.Format("{0} Mbit/s", Math.Round(bpsRate / (1000 * 1000.0), 0));
             }
             return Result;
         }
@@ -312,6 +334,15 @@ namespace FarNet.ACD
         public static List<string> StringToList(string text)
         {
             return text.Split(new[] { Environment.NewLine }, StringSplitOptions.None).ToList();
+        }
+
+        /// <summary>
+        /// Gets Unix timestamp
+        /// </summary>
+        /// <returns></returns>
+        public static int GetUnixTimestamp()
+        {
+            return (int)(DateTime.UtcNow.Subtract(_1900101)).TotalSeconds;
         }
     }
 }
