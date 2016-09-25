@@ -6,6 +6,7 @@ Experimental Amazon Cloud Drive FarNet module
 * Panel: Partial file upload indication
 * Export Files: Ask for the path where to copy the files
 * Request Client ID and Client Secret on first panel open
+* Set date and time to the original file date-time
 
 ## Possible further extension
 * Share/Unshare files via menu
